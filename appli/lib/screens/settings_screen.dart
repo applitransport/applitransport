@@ -512,10 +512,23 @@ class _GeneralTab extends StatelessWidget {
         Text('À propos', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 4),
         Text(
-          '${app.catalog.length} lignes au catalogue, ${app.downloaded.length} téléchargée(s). '
-          'Temps réel encore simulé ; itinéraires : exemples enregistrés.\n\n'
-          'Données horaires : Île-de-France Mobilités, licence ODbL.\n'
+          'AppliTransport — licence PolyForm Strict 1.0.0 : utilisation gratuite à des fins non '
+          'commerciales, sans modification ni redistribution.\n\n'
+          '${app.catalog.length} lignes au catalogue, ${app.downloaded.length} téléchargée(s).\n'
+          'Données : © Île-de-France Mobilités, licence ODbL.\n'
           'Fond de carte : © contributeurs OpenStreetMap.',
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            icon: const Icon(Icons.description_outlined),
+            label: const Text('Licences des bibliothèques et des données'),
+            onPressed: () => showLicensePage(
+              context: context,
+              applicationName: 'AppliTransport',
+              applicationLegalese: 'PolyForm Strict 1.0.0 · données Île-de-France Mobilités (ODbL)',
+            ),
+          ),
         ),
       ],
     );

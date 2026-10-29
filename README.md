@@ -26,3 +26,8 @@ python3 -m venv .venv && .venv/bin/pip install -r usine/requirements.txt
 .venv/bin/python usine/update.py          # ne refait tout que si IDFM a publié un nouveau GTFS
 .venv/bin/python -m http.server 8080 --bind 127.0.0.1 --directory usine/out/public
 ```
+
+## Licence
+Code : [PolyForm Strict 1.0.0](LICENSE.md) — utilisation gratuite à des fins non commerciales, sans
+modification ni redistribution. Données : © Île-de-France Mobilités, ODbL ; carte : © OpenStreetMap.
+Détails et bibliothèques tierces : [NOTICE.md](NOTICE.md).

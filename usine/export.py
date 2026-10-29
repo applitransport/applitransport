@@ -194,12 +194,19 @@ def export(db_file=DB_FILE, out_dir=PUBLIC_DIR, feed_info=None):
         areas.append(area)
 
     catalog = {"format": FORMAT, "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+               "license": {"name": "ODbL 1.0", "url": "https://opendatacommons.org/licenses/odbl/1-0/",
+                           "attribution": "Île-de-France Mobilités"},
                "feed": feed_info or {}, "networks": networks, "lines": catalog_lines,
                "stop_areas": sorted(areas, key=lambda a: a["name"])}
     # paquets de lignes disparues du GTFS : retirés de la publication
     for old in set(lines_dir.glob("*.json.gz")) - {out_dir / l["file"] for l in catalog_lines}:
         old.unlink()
     write_gz(out_dir / "catalog.json.gz", catalog)
+    (out_dir / "LICENCE.txt").write_text(
+        "Données : © Île-de-France Mobilités, Open Database License (ODbL) 1.0\n"
+        "https://opendatacommons.org/licenses/odbl/1-0/\n\n"
+        "Base de données dérivée (catalogue et paquets de lignes) produite par l'usine d'AppliTransport :\n"
+        "https://github.com/applitransport/applitransport\n", encoding="utf-8")
     print(f"{len(catalog_lines)} paquets : {total_raw / 1e6:.0f} Mo bruts, {total_gz / 1e6:.0f} Mo compressés ; "
           f"catalogue {(out_dir / 'catalog.json.gz').stat().st_size / 1e6:.1f} Mo ({len(areas)} zones d'arrêt, "
           f"{sum('town' in a for a in areas)} avec commune) "
