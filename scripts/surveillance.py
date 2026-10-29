@@ -21,7 +21,7 @@ from pathlib import Path
 import httpx
 
 ROOT = Path(__file__).resolve().parent.parent
-KEY = (ROOT / ".prim_key").read_text().strip()
+KEY_FILE = ROOT / ".prim_key"  # relu à chaque requête : un jeton régénéré est pris en compte sans redémarrer
 BASE = "https://prim.iledefrance-mobilites.fr/marketplace"
 LINES = {"C01736": "Transilien N", "C01527": "Bus 5104"}
 NORMAL_STATUSES = {"ON_TIME", "ONTIME", "ARRIVED", ""}
@@ -38,7 +38,7 @@ class Monitor:
     def __init__(self, out_dir):
         self.out = out_dir
         (out_dir / "brut").mkdir(parents=True, exist_ok=True)
-        self.client = httpx.Client(timeout=30, headers={"apikey": KEY, "Accept": "application/json"})
+        self.client = httpx.Client(timeout=30, headers={"Accept": "application/json"})
         self.requests = Counter()
         self.seen_disruptions = set()
         new = not (out_dir / "resume.csv").exists()
@@ -52,7 +52,7 @@ class Monitor:
         if self.requests[kind] >= MAX_REQUESTS[kind]:
             raise RuntimeError(f"garde-fou : {MAX_REQUESTS[kind]} requêtes « {kind} » atteintes")
         self.requests[kind] += 1
-        r = self.client.get(f"{BASE}/{path}", params=params)
+        r = self.client.get(f"{BASE}/{path}", params=params, headers={"apikey": KEY_FILE.read_text().strip()})
         r.raise_for_status()
         return r.json()
 

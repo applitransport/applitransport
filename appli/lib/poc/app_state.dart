@@ -4,6 +4,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:http/http.dart' as http;
+
 import '../data/package_decoder.dart';
 import '../data/prim.dart';
 import '../data/realtime.dart';
@@ -12,6 +14,7 @@ import '../data/traffic.dart';
 import '../data/settings_store.dart';
 import 'data.dart';
 import 'itineraries.dart';
+import '../widgets/locked_field.dart' show TestResult;
 
 class AppState extends ChangeNotifier {
   AppState(this.repo, this.settings, this.usage) {
@@ -83,16 +86,24 @@ class AppState extends ChangeNotifier {
     if (bulk != null || ids.isEmpty) return;
     bulk = (done: 0, total: ids.length);
     notifyListeners();
-    await _guard(() => repo.downloadMany(ids, onProgress: (d, t) {
+    await _guard(
+      () => repo.downloadMany(
+        ids,
+        onProgress: (d, t) {
           bulk = (done: d, total: t);
           notifyListeners();
-        }));
+        },
+      ),
+    );
     bulk = null;
     _timetables.clear();
     notifyListeners();
   }
 
-  Future<void> downloadAll() => _downloadMany([for (final l in catalog) if (!hasSchedules(l.id)) l.id]);
+  Future<void> downloadAll() => _downloadMany([
+    for (final l in catalog)
+      if (!hasSchedules(l.id)) l.id,
+  ]);
 
   Future<void> updateAll() => _downloadMany(repo.outdated);
 
@@ -141,8 +152,10 @@ class AppState extends ChangeNotifier {
   }
 
   /// Horaires du jour des lignes téléchargées parmi [ids].
-  List<DemoLine> timetablesOf(Iterable<String> ids) =>
-      [for (final id in ids) if (hasSchedules(id)) timetable(id)!];
+  List<DemoLine> timetablesOf(Iterable<String> ids) => [
+    for (final id in ids)
+      if (hasSchedules(id)) timetable(id)!,
+  ];
 
   // --- lignes préférées -------------------------------------------------------------
   List<String> get preferred => settings.preferred;
@@ -175,9 +188,9 @@ class AppState extends ChangeNotifier {
   void setAutoMinutes(int m) => _set(() => settings.autoMinutes = m);
 
   void setDataUrl(String url) => _set(() {
-        settings.dataUrl = url.trim();
-        repo.baseUrl = settings.dataUrl;
-      });
+    settings.dataUrl = url.trim();
+    repo.baseUrl = settings.dataUrl;
+  });
 
   void _set(void Function() change) {
     change();
@@ -185,22 +198,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- heure simulée (pour tester le soir ou la nuit) ----------------------------
-  TimeOfDay? simulatedTime;
-  DateTime? _simulatedSetAt;
-
-  void setSimulatedTime(TimeOfDay? t) {
-    simulatedTime = t;
-    _simulatedSetAt = DateTime.now();
-    notifyListeners();
-  }
-
-  DateTime now() {
-    final real = DateTime.now();
-    if (simulatedTime == null) return real;
-    final base = DateTime(real.year, real.month, real.day, simulatedTime!.hour, simulatedTime!.minute);
-    return base.add(real.difference(_simulatedSetAt!));
-  }
+  DateTime now() => DateTime.now();
 
   int nowSec() {
     final n = now();
@@ -210,15 +208,44 @@ class AppState extends ChangeNotifier {
   // --- compteurs de requêtes PRIM (réelles, conservées sur l'appareil) ---------------
   Map<String, int> get requests => {for (final k in primKinds.keys) k: usage.of(k)};
 
-  /// Vérifie le jeton avec la requête la moins coûteuse (Info Trafic, quota de 4000).
-  Future<String> testToken() async {
+  /// Vérifie un jeton (celui saisi, avant de l'enregistrer) avec la requête la moins coûteuse
+  /// (Info Trafic, quota de 4000).
+  Future<TestResult> testToken(String candidate) async {
+    if (candidate.isEmpty) return (ok: false, message: 'Aucun jeton saisi');
     try {
-      final r = await prim.lineReports('C01527');
-      notifyListeners();
-      return 'Jeton valide (${(r['disruptions'] as List? ?? const []).length} perturbation(s) sur la 5104)';
+      final r = await PrimClient(token: () => candidate, usage: usage).lineReports('C01527');
+      return (
+        ok: true,
+        message: 'Jeton valide (${(r['disruptions'] as List? ?? const []).length} perturbation(s) sur la 5104)',
+      );
     } catch (e) {
+      return (ok: false, message: '$e');
+    } finally {
       notifyListeners();
-      return 'Échec : $e';
+    }
+  }
+
+  /// Vérifie qu'une adresse de serveur publie bien un catalogue lisible, sans rien enregistrer.
+  Future<TestResult> testDataUrl(String url) async {
+    try {
+      final base = Uri.parse(url.endsWith('/') ? url : '$url/');
+      final r = await http.get(base.resolve('catalog.json.gz')).timeout(const Duration(seconds: 15));
+      if (r.statusCode != 200) {
+        return (ok: false, message: 'Serveur joignable mais catalogue absent (HTTP ${r.statusCode})');
+      }
+      final c = readPackage(r.bodyBytes);
+      final at = DateTime.tryParse(c['generated_at'] ?? '')?.toLocal();
+      return (
+        ok: true,
+        message:
+            'Catalogue de ${(c['lines'] as List).length} lignes'
+            '${at == null ? '' : ', publié le ${at.day.toString().padLeft(2, '0')}/${at.month.toString().padLeft(2, '0')} '
+                      'à ${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}'}',
+      );
+    } on FormatException {
+      return (ok: false, message: 'Réponse illisible : ce n\'est pas un catalogue AppliTransport');
+    } catch (e) {
+      return (ok: false, message: 'Serveur injoignable ($e)');
     }
   }
 
@@ -297,7 +324,7 @@ class AppState extends ChangeNotifier {
       final data = await prim.places(query);
       final out = [
         for (final p in (data['places'] ?? const []) as List)
-          if (p['embedded_type'] == 'address') (p['name'] as String, p['id'] as String)
+          if (p['embedded_type'] == 'address') (p['name'] as String, p['id'] as String),
       ];
       notifyListeners();
       return _addresses[key] = out;

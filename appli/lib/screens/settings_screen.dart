@@ -1,10 +1,12 @@
 // Configuration : lignes (disponibles / téléchargées / préférées), jeton PRIM, réglages généraux.
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/prim.dart';
 import '../poc/app_state.dart';
 import '../poc/data.dart';
 import '../widgets/line_badge.dart';
+import '../widgets/locked_field.dart';
 
 String _date(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
 String _dateTime(DateTime d) =>
@@ -386,22 +388,9 @@ class _LinesTabState extends State<_LinesTab> {
 
 // --- Jeton PRIM --------------------------------------------------------------------
 
-class _TokenTab extends StatefulWidget {
+class _TokenTab extends StatelessWidget {
   const _TokenTab({required this.app});
   final AppState app;
-
-  @override
-  State<_TokenTab> createState() => _TokenTabState();
-}
-
-class _TokenTabState extends State<_TokenTab> {
-  late final _ctrl = TextEditingController(text: widget.app.token);
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -413,36 +402,12 @@ class _TokenTabState extends State<_TokenTab> {
         '« Calculateur »). Il reste enregistré sur l\'appareil uniquement.',
       ),
       const SizedBox(height: 16),
-      TextField(
-        controller: _ctrl,
-        decoration: const InputDecoration(labelText: 'Jeton PRIM', border: OutlineInputBorder()),
-      ),
-      const SizedBox(height: 12),
-      Row(
-        children: [
-          FilledButton(
-            onPressed: () {
-              widget.app.setToken(_ctrl.text);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Jeton enregistré')));
-            },
-            child: const Text('Enregistrer'),
-          ),
-          const SizedBox(width: 12),
-          OutlinedButton(
-            onPressed: () async {
-              widget.app.setToken(_ctrl.text);
-              final msg = await widget.app.testToken();
-              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-            },
-            child: const Text('Tester'),
-          ),
-        ],
-      ),
+      LockedField(label: 'Jeton PRIM', value: app.token, onSave: (v) async => app.setToken(v), onTest: app.testToken),
       const SizedBox(height: 24),
       Text('Requêtes PRIM aujourd\'hui depuis cet appareil', style: Theme.of(context).textTheme.titleSmall),
       const Text('(la page de votre compte PRIM fait foi : elle compte aussi les autres usages du jeton)'),
       const SizedBox(height: 8),
-      for (final e in widget.app.requests.entries) ...[
+      for (final e in app.requests.entries) ...[
         Text('Requête ${e.key} : ${e.value} / ${primQuota[e.key]} · ${primKinds[e.key]}'),
         const SizedBox(height: 4),
         LinearProgressIndicator(value: e.value / primQuota[e.key]!),
@@ -460,7 +425,6 @@ class _GeneralTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sim = app.simulatedTime;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -491,29 +455,38 @@ class _GeneralTab extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         const Divider(),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Heure simulée (POC)'),
-          subtitle: Text(
-            sim == null
-                ? 'Désactivée : heure réelle'
-                : 'Départ de la simulation à ${sim.format(context)}, puis l\'heure avance normalement',
-          ),
-          value: sim != null,
-          onChanged: (on) async {
-            if (!on) return app.setSimulatedTime(null);
-            final t = await showTimePicker(context: context, initialTime: const TimeOfDay(hour: 8, minute: 0));
-            if (t != null) app.setSimulatedTime(t);
-          },
+        Text('Serveur de données', style: Theme.of(context).textTheme.titleMedium),
+        const Text(
+          'Par défaut : la publication quotidienne sur GitHub. Pour tester une usine locale : '
+          'http://<adresse du PC>:8080/.',
         ),
-        const Divider(),
-        _DataUrlField(app: app),
+        const SizedBox(height: 8),
+        LockedField(
+          label: 'Adresse du serveur',
+          value: app.dataUrl,
+          onSave: (v) async {
+            app.setDataUrl(v);
+            await app.checkUpdates(); // nouveau serveur : on relit son catalogue
+          },
+          onTest: app.testDataUrl,
+        ),
+        const SizedBox(height: 8),
         const Divider(),
         Text('À propos', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 4),
+        FutureBuilder(
+          future: PackageInfo.fromPlatform(),
+          builder: (context, info) => Text(
+            info.hasData
+                ? 'AppliTransport version ${info.data!.version} (${info.data!.buildNumber})'
+                : 'AppliTransport',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        const SizedBox(height: 4),
         Text(
-          'AppliTransport — licence PolyForm Strict 1.0.0 : utilisation gratuite à des fins non '
-          'commerciales, sans modification ni redistribution.\n\n'
+          'Licence PolyForm Strict 1.0.0 : utilisation gratuite à des fins non '
+          'commerciales, sans modification ni redistribution. Copyright © 2026 Sébastien N.\n\n'
           '${app.catalog.length} lignes au catalogue, ${app.downloaded.length} téléchargée(s).\n'
           'Données : © Île-de-France Mobilités, licence ODbL.\n'
           'Fond de carte : © contributeurs OpenStreetMap.',
@@ -533,55 +506,4 @@ class _GeneralTab extends StatelessWidget {
       ],
     );
   }
-}
-
-/// Adresse du serveur qui publie le catalogue et les lignes (GitHub plus tard).
-class _DataUrlField extends StatefulWidget {
-  const _DataUrlField({required this.app});
-  final AppState app;
-
-  @override
-  State<_DataUrlField> createState() => _DataUrlFieldState();
-}
-
-class _DataUrlFieldState extends State<_DataUrlField> {
-  late final _ctrl = TextEditingController(text: widget.app.dataUrl);
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text('Serveur de données', style: Theme.of(context).textTheme.titleMedium),
-      const Text(
-        'Par défaut : la publication quotidienne sur GitHub. Pour tester une usine locale : '
-        'http://<adresse du PC>:8080/.',
-      ),
-      const SizedBox(height: 8),
-      Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _ctrl,
-              decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-            ),
-          ),
-          const SizedBox(width: 8),
-          FilledButton(
-            onPressed: () {
-              widget.app.setDataUrl(_ctrl.text);
-              widget.app.checkUpdates();
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-      const SizedBox(height: 8),
-    ],
-  );
 }
