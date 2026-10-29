@@ -27,11 +27,21 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r usine/requirements.txt
-      # machine neuve à chaque fois : on reconstruit tout (~4 min) ; les versions des paquets
-      # dépendent du contenu, donc une ligne inchangée garde sa version
+      # publication de la veille : une ligne dont les horaires n'ont pas changé garde son paquet et
+      # sa version, et les applis ne la retéléchargent pas
+      - uses: actions/cache/restore@v4
+        with:
+          path: usine/out/public
+          key: publication-${{ github.run_id }}
+          restore-keys: publication-
+      # machine neuve à chaque fois : on reconstruit la base (~4 min)
       - run: python usine/update.py --force
       - name: Contrôle de deux paquets
         run: python usine/check_package.py C01527 C01528
+      - uses: actions/cache/save@v4
+        with:
+          path: usine/out/public
+          key: publication-${{ github.run_id }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: usine/out/public

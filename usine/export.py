@@ -24,7 +24,8 @@ import json
 import sqlite3
 import time
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import sys
 from pathlib import Path
 
@@ -129,16 +130,79 @@ def build_line(db, route):
             local_shape[p["shape_id"]] = f"s{len(local_shape)}"
         p["shape_id"] = local_shape.get(p["shape_id"])
 
+    # IDFM renumérote aussi ses calendriers : numérotation locale stable (ordre d'apparition des courses)
+    local_service = {}
+    for t in out_trips:
+        t[2] = local_service.setdefault(t[2], f"c{len(local_service)}")
+    calendar = {local_service[k]: v for k, v in calendar.items() if k in local_service}
+    calendar_dates = {local_service[k]: v for k, v in calendar_dates.items() if k in local_service}
+
     package = {
         "format": FORMAT, "route_id": route_id,
         "line": {k: route[k] for k in ("short_name", "long_name", "type", "network", "color", "text_color")},
         "stops": stops,
         "shapes": {local_shape[sid]: encode_polyline(p) for sid, p in pts.items() if sid in local_shape},
         "patterns": patterns, "trips": out_trips,
-        "calendar": calendar, "calendar_dates": dict(calendar_dates),
+        "calendar": calendar, "calendar_dates": calendar_dates,
     }
     package["version"] = hashlib.sha256(json.dumps(package, sort_keys=True).encode()).hexdigest()[:16]
     return package, stop_ids
+
+
+# Une ligne n'est republiée que si ses horaires changent vraiment, ou quand la version en place ne
+# couvre plus que MIN_COVERAGE jours : IDFM republie chaque jour en décalant sa période d'un jour,
+# sans quoi chaque ligne changerait de version tous les jours et l'appli retéléchargerait tout.
+MIN_COVERAGE = timedelta(days=21)
+
+
+def _active(pkg, service, day):
+    key = day.strftime("%Y%m%d")
+    for d, typ in pkg["calendar_dates"].get(service, []):
+        if d == key:
+            return typ == 1
+    c = pkg["calendar"].get(service)
+    return bool(c) and c[1] <= key <= c[2] and c[0][day.weekday()] == "1"
+
+
+def _last_day(pkg):
+    ends = [c[2] for c in pkg["calendar"].values()]
+    ends += [d for dates in pkg["calendar_dates"].values() for d, typ in dates if typ == 1]
+    return datetime.strptime(max(ends), "%Y%m%d").date() if ends else None
+
+
+def _trip_prints(pkg):
+    """Empreinte de chaque course (parcours, tracé, destination, heures), par service : insensible
+    aux renumérotations d'IDFM (courses, calendriers)."""
+    patterns, stops, shapes = pkg["patterns"], pkg["stops"], pkg["shapes"]
+    by_service = defaultdict(list)
+    for t in pkg["trips"]:
+        p = patterns[t[1]]
+        by_service[t[2]].append(hash((p["direction_id"], p["headsign"], shapes.get(p["shape_id"]) if p["shape_id"] else None,
+                                      tuple(tuple(stops[s]) for s in p["stops"]), t[3], tuple(t[4]),
+                                      tuple(t[5]) if len(t) > 5 else ())))
+    return by_service
+
+
+def _day_signature(pkg, prints, day):
+    """Horaires effectifs d'un jour : empreintes des courses qui roulent ce jour-là."""
+    return sorted(h for service, hashes in prints.items() if _active(pkg, service, day) for h in hashes)
+
+
+def still_valid(old, new, today):
+    """La publication précédente [old] donne-t-elle les mêmes horaires que [new] chaque jour qu'elle
+    couvre encore, et couvre-t-elle assez loin (MIN_COVERAGE, ou autant que [new]) ?"""
+    if old.get("format") != FORMAT or old.get("line") != new["line"]:
+        return False
+    old_end, new_end = _last_day(old), _last_day(new)
+    if old_end is None or new_end is None or old_end < min(today + MIN_COVERAGE, new_end):
+        return False
+    old_prints, new_prints = _trip_prints(old), _trip_prints(new)
+    day = today
+    while day <= min(old_end, new_end):
+        if _day_signature(old, old_prints, day) != _day_signature(new, new_prints, day):
+            return False
+        day += timedelta(days=1)
+    return True
 
 
 def export(db_file=DB_FILE, out_dir=PUBLIC_DIR, feed_info=None):
@@ -150,7 +214,8 @@ def export(db_file=DB_FILE, out_dir=PUBLIC_DIR, feed_info=None):
     networks = dict(db.execute("SELECT agency_id, agency_name FROM agency"))
     stop_parent = {sid: parent or sid for sid, parent in db.execute("SELECT stop_id, parent_station FROM stops")}
 
-    catalog_lines, area_lines, total_raw, total_gz = [], defaultdict(set), 0, 0
+    catalog_lines, area_lines, total_gz, kept = [], defaultdict(set), 0, 0
+    today = datetime.now(ZoneInfo("Europe/Paris")).date()
     routes = db.execute("SELECT route_id, agency_id, short_name, long_name, route_type, color, text_color "
                         "FROM routes ORDER BY route_type, agency_id, short_name").fetchall()
     for i, (route_id, agency_id, short, long_, rtype, color, text_color) in enumerate(routes, 1):
@@ -161,7 +226,12 @@ def export(db_file=DB_FILE, out_dir=PUBLIC_DIR, feed_info=None):
         if not package:
             continue
         path = lines_dir / f"{file_name(route_id)}.json.gz"
-        total_raw += write_gz(path, package)
+        old = json.loads(gzip.decompress(path.read_bytes())) if path.exists() else None
+        if old is not None and still_valid(old, package, today):
+            package = old  # mêmes horaires : on garde la publication précédente et sa version
+            kept += 1
+        else:
+            write_gz(path, package)
         size = path.stat().st_size
         total_gz += size
         catalog_lines.append({**route, "file": f"lines/{path.name}", "version": package["version"], "size": size})
@@ -207,7 +277,8 @@ def export(db_file=DB_FILE, out_dir=PUBLIC_DIR, feed_info=None):
         "https://opendatacommons.org/licenses/odbl/1-0/\n\n"
         "Base de données dérivée (catalogue et paquets de lignes) produite par l'usine d'AppliTransport :\n"
         "https://github.com/applitransport/applitransport\n", encoding="utf-8")
-    print(f"{len(catalog_lines)} paquets : {total_raw / 1e6:.0f} Mo bruts, {total_gz / 1e6:.0f} Mo compressés ; "
+    print(f"{len(catalog_lines)} paquets ({kept} inchangés, {len(catalog_lines) - kept} republiés) : "
+          f"{total_gz / 1e6:.0f} Mo compressés ; "
           f"catalogue {(out_dir / 'catalog.json.gz').stat().st_size / 1e6:.1f} Mo ({len(areas)} zones d'arrêt, "
           f"{sum('town' in a for a in areas)} avec commune) "
           f"en {time.time() - t0:.0f} s")

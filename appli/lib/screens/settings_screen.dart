@@ -559,8 +559,8 @@ class _DataUrlFieldState extends State<_DataUrlField> {
     children: [
       Text('Serveur de données', style: Theme.of(context).textTheme.titleMedium),
       const Text(
-        'Développement : le PC qui sert usine/out/public. Sur un téléphone, remplacer 127.0.0.1 '
-        'par l\'adresse du PC sur le réseau local.',
+        'Par défaut : la publication quotidienne sur GitHub. Pour tester une usine locale : '
+        'http://<adresse du PC>:8080/.',
       ),
       const SizedBox(height: 8),
       Row(
