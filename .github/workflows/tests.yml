@@ -1,0 +1,38 @@
+# Tests à chaque envoi : analyse et tests de l'appli Flutter, validité du code Python.
+# (Pas de compilation d'APK : l'APK release est compilé et signé en local, voir appli/compiler_release.sh.)
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  appli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: appli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.0
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Usine, scripts et POC compilent
+        run: python -m compileall -q usine scripts poc_web
