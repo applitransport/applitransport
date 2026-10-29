@@ -1,5 +1,8 @@
-# secrets
+# secrets (jeton PRIM, signature de l'appli)
 .prim_key
+appli/android/key.properties
+*.jks
+*.keystore
 
 # environnements et fichiers générés
 .venv/

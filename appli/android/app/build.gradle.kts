@@ -1,3 +1,22 @@
+import java.io.FileInputStream
+import java.util.Properties
+
+// Signature release avec le keystore personnel. Le mot de passe n'est enregistré nulle part :
+// compiler_release.sh le demande et le passe par des variables d'environnement, le temps d'une
+// compilation. (Variante possible : android/key.properties, jamais versionné, avec storeFile,
+// storePassword, keyAlias et keyPassword.)
+val keyProperties = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) {
+        load(FileInputStream(f))
+    } else if (System.getenv("APPLI_KEYSTORE") != null) {
+        setProperty("storeFile", System.getenv("APPLI_KEYSTORE"))
+        setProperty("storePassword", System.getenv("APPLI_KEYSTORE_PASSWORD") ?: "")
+        setProperty("keyAlias", System.getenv("APPLI_KEY_ALIAS") ?: "applitransport")
+        setProperty("keyPassword", System.getenv("APPLI_KEY_PASSWORD") ?: System.getenv("APPLI_KEYSTORE_PASSWORD") ?: "")
+    }
+}
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -15,21 +34,27 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "fr.applitransport.app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (keyProperties.isNotEmpty()) {
+            create("release") {
+                storeFile = file(keyProperties.getProperty("storeFile"))
+                storePassword = keyProperties.getProperty("storePassword")
+                keyAlias = keyProperties.getProperty("keyAlias")
+                keyPassword = keyProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 }
@@ -42,4 +67,12 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+// Pas de signature de secours : un APK release doit toujours porter la clé personnelle, sans quoi
+// Android refuserait les mises à jour. Les compilations de développement ne sont pas concernées.
+gradle.taskGraph.whenReady {
+    if (keyProperties.isEmpty() && allTasks.any { it.name.contains("Release") }) {
+        throw GradleException("Signature release : lancez appli/compiler_release.sh (voir en tête de app/build.gradle.kts)")
+    }
 }
