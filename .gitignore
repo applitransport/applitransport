@@ -13,5 +13,5 @@ appli/android/local.properties
 appli/android/app/.cxx/
 
 # données (téléchargées ou produites ; la publication se fait par GitHub Pages)
-data/
+/data/
 usine/out/
