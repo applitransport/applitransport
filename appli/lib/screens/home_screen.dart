@@ -59,7 +59,7 @@ class HomeScreen extends StatelessWidget {
         useCase(Icons.directions, 'Itinéraire',
             'Depuis ma position, une adresse ou un arrêt, avec correspondances (internet).', ItineraryScreen(app: app)),
         const SizedBox(height: 24),
-        Text('POC IHM : données de démonstration, temps réel simulé.',
+        Text('Données © Île-de-France Mobilités · carte © OpenStreetMap',
             textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
       ]),
     );

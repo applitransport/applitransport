@@ -1,5 +1,5 @@
 name: applitransport
-description: "Suivi temps réel des bus Île-de-France (POC IHM)"
+description: "Transports en commun d'Île-de-France : horaires hors ligne, temps réel, itinéraires"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
