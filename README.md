@@ -8,8 +8,8 @@ des bus, temps réel et perturbations, itinéraires. Données Île-de-France Mob
 | `usine/` | **Usine à données** (Python) : GTFS IDFM → catalogue + un paquet par ligne, publiés chaque jour sur GitHub Pages ([README](usine/README.md)) |
 | `appli/` | **Appli** Flutter (Android, et Linux pour les tests sur PC) ([README](appli/README.md)) |
 | `.github/workflows/usine.yml` | Tâche quotidienne de l'usine et publication |
-| `scripts/` | Outils : surveillance du temps réel PRIM, génération des données de référence des tests |
-| `app/`, `web/` | Premier POC web (FastAPI + Leaflet), gardé comme référence |
+| `scripts/` | Outils : surveillance du temps réel PRIM, icône de l'appli, données de référence des tests |
+| `poc_web/` | Premier POC web (FastAPI + Leaflet), archivé comme référence ([README](poc_web/README.md)) |
 
 ## Fonctionnement
 ```

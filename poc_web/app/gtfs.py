@@ -4,7 +4,7 @@ import math
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "lines.json"
+DATA_FILE = Path(__file__).resolve().parents[2] / "data" / "lines.json"
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
 

@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 BASE_URL = "https://prim.iledefrance-mobilites.fr/marketplace"
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]  # racine du projet (.prim_key, data/)
 KEY_FILE = ROOT / ".prim_key"
 USAGE_FILE = ROOT / "data" / "prim_usage.json"
 TZ = ZoneInfo("Europe/Paris")
