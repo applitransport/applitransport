@@ -18,3 +18,6 @@ appli/android/app/.cxx/
 # données (téléchargées ou produites ; la publication se fait par GitHub Pages)
 /data/
 usine/out/
+
+# réglages propres à un poste de développement
+appli/pubspec_overrides.yaml

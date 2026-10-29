@@ -94,8 +94,3 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
-
-# path_provider_foundation >= 2.5 (iOS/macOS, inutilisé ici) dépend de objective_c, qui exige
-# l'option « native assets » désactivée sur ce poste : on garde la version précédente.
-dependency_overrides:
-  path_provider_foundation: ">=2.4.0 <2.5.0"
