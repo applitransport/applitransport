@@ -1,20 +1,21 @@
 // État de l'appli : catalogue et lignes réels (dépôt local alimenté par l'usine), réglages
 // conservés sur l'appareil, temps réel et perturbations PRIM.
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
-
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/package_decoder.dart';
 import '../data/prim.dart';
 import '../data/realtime.dart';
 import '../data/repository.dart';
-import '../data/traffic.dart';
 import '../data/settings_store.dart';
+import '../data/traffic.dart';
+import '../widgets/locked_field.dart' show TestResult;
 import 'data.dart';
 import 'itineraries.dart';
-import '../widgets/locked_field.dart' show TestResult;
 
 class AppState extends ChangeNotifier {
   AppState(this.repo, this.settings, this.usage) {
@@ -128,11 +129,43 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Au démarrage : une vérification par jour au plus (silencieuse si le serveur est injoignable).
+  /// Au démarrage : vérification des horaires une fois par jour au plus (silencieuse sans réseau)
+  /// et mise à jour automatique des lignes téléchargées dont les horaires ont changé (quelques Ko
+  /// chacune) ; puis recherche d'une nouvelle version de l'appli.
   Future<void> dailyCheck() async {
     final last = repo.lastCheck;
     if (repo.catalog == null || last == null || DateTime.now().difference(last).inHours >= 24) {
       await checkUpdates();
+      if (lastError == null && repo.outdated.isNotEmpty) await updateAll();
+    }
+    await checkAppUpdate();
+  }
+
+  // --- nouvelle version de l'appli (Releases GitHub) -------------------------------------
+  static const releasesApi = 'https://api.github.com/repos/applitransport/applitransport/releases/latest';
+
+  /// Dernière version publiée, si elle est plus récente que celle installée.
+  ({String version, String url})? appUpdate;
+
+  /// Lit la dernière Release : version (tag « v1.1.0 ») et lien de l'APK joint. Silencieux sans réseau.
+  Future<void> checkAppUpdate() async {
+    try {
+      final r = await http
+          .get(Uri.parse(releasesApi), headers: {'Accept': 'application/vnd.github+json'})
+          .timeout(const Duration(seconds: 10));
+      if (r.statusCode != 200) return;
+      final j = jsonDecode(r.body) as Map<String, dynamic>;
+      final latest = (j['tag_name'] as String? ?? '').replaceFirst(RegExp('^v'), '');
+      final installed = (await PackageInfo.fromPlatform()).version;
+      if (!isNewerVersion(latest, installed)) return;
+      final apk = [
+        for (final a in (j['assets'] ?? const []) as List)
+          if ((a['name'] as String).endsWith('.apk')) a['browser_download_url'] as String,
+      ].firstOrNull;
+      appUpdate = (version: latest, url: apk ?? j['html_url'] as String);
+      notifyListeners();
+    } catch (_) {
+      // pas de réseau ou réponse inattendue : on réessaiera à la prochaine ouverture
     }
   }
 
@@ -372,4 +405,15 @@ class AppState extends ChangeNotifier {
   /// Temps réel d'une course, ou null si PRIM n'en a rien dit (horaire théorique).
   TripRealtime? rt(String lineId, int directionId, int variant, int trip) =>
       _realtime[lineId]?[tripKey(directionId, variant, trip)];
+}
+
+/// « 1.10.0 » est-elle plus récente que « 1.9.2 » ? (comparaison numérique, partie par partie)
+bool isNewerVersion(String candidate, String installed) {
+  List<int> parts(String v) => [for (final p in v.split('.')) int.tryParse(p.split(RegExp(r'[^0-9]')).first) ?? 0];
+  final a = parts(candidate), b = parts(installed);
+  for (var i = 0; i < a.length || i < b.length; i++) {
+    final x = i < a.length ? a[i] : 0, y = i < b.length ? b[i] : 0;
+    if (x != y) return x > y;
+  }
+  return false;
 }
