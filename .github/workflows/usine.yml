@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: "30 7 * * *" # 07:30 UTC, après la publication quotidienne d'IDFM (vers 06:25 UTC)
   workflow_dispatch: # lancement manuel depuis l'onglet Actions
+  push: # code de l'usine modifié : on republie sans attendre le lendemain
+    branches: [main]
+    paths:
+      - "usine/**"
+      - ".github/workflows/usine.yml"
 
 permissions:
   contents: read
@@ -34,6 +39,8 @@ jobs:
           path: usine/out/public
           key: publication-${{ github.run_id }}
           restore-keys: publication-
+      # cache perdu (inutilisé 7 jours, purge) : on repart de la publication en ligne
+      - run: python usine/restore_publication.py
       # machine neuve à chaque fois : on reconstruit la base (~4 min)
       - run: python usine/update.py --force
       - name: Contrôle de deux paquets
