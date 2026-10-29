@@ -1,0 +1,47 @@
+# Usine à données : chaque jour, transforme le GTFS d'Île-de-France Mobilités en catalogue + paquets
+# de lignes, et les publie sur GitHub Pages (https://<compte>.github.io/<dépôt>/catalog.json.gz).
+# Les applis comparent les versions et ne téléchargent que les lignes modifiées.
+name: Usine à données
+
+on:
+  schedule:
+    - cron: "30 7 * * *" # 07:30 UTC, après la publication quotidienne d'IDFM (vers 06:25 UTC)
+  workflow_dispatch: # lancement manuel depuis l'onglet Actions
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r usine/requirements.txt
+      # machine neuve à chaque fois : on reconstruit tout (~4 min) ; les versions des paquets
+      # dépendent du contenu, donc une ligne inchangée garde sa version
+      - run: python usine/update.py --force
+      - name: Contrôle de deux paquets
+        run: python usine/check_package.py C01527 C01528
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: usine/out/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

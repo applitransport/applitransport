@@ -1,0 +1,17 @@
+# secrets
+.prim_key
+
+# environnements et fichiers générés
+.venv/
+__pycache__/
+appli/build/
+appli/.dart_tool/
+appli/.flutter-plugins-dependencies
+appli/linux/flutter/ephemeral/
+appli/android/.gradle/
+appli/android/local.properties
+appli/android/app/.cxx/
+
+# données (téléchargées ou produites ; la publication se fait par GitHub Pages)
+data/
+usine/out/
