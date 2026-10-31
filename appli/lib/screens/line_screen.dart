@@ -115,6 +115,8 @@ class _LineScreenState extends State<LineScreen> {
       final i = d.variants[v].indexOf(_stop!);
       if (i < 0 || i >= d.variants[v].stops.length - 1) continue;
       for (var t = 0; t < d.variants[v].trips.length; t++) {
+        // course de la veille passée à cet arrêt avant minuit : pas dans la liste du jour
+        if (d.variants[v].trips[t][i] < 0) continue;
         out.add(_Passage(v, t, i, d.variants[v].trips[t][i]));
       }
     }

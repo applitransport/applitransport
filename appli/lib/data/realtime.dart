@@ -152,14 +152,17 @@ Map<String, TripRealtime> matchToTimetable(
   int secOf(DateTime t) => t.difference(midnight).inSeconds;
   final code = line.id;
 
-  // index : numéro de course → clé ; quai → [(heure, clé)]
-  final byNumber = <String, (int, int, int)>{};
+  // index : numéro de course → clés (une course peut rouler la nuit passée et ce soir : deux clés) ;
+  // quai → [(heure, clé)]
+  final byNumber = <String, List<(int, int, int)>>{};
   final byStop = <String, List<(int, (int, int, int))>>{};
   for (final d in line.directions) {
     for (var v = 0; v < d.variants.length; v++) {
       final variant = d.variants[v];
       for (var t = 0; t < variant.trips.length; t++) {
-        if (t < variant.tripIds.length) byNumber[variant.tripIds[t].split('-').last] = (d.id, v, t);
+        if (t < variant.tripIds.length) {
+          byNumber.putIfAbsent(variant.tripIds[t].split('-').last, () => []).add((d.id, v, t));
+        }
         for (var i = 0; i < variant.stops.length; i++) {
           byStop.putIfAbsent(variant.stops[i].id, () => []).add((variant.trips[t][i], (d.id, v, t)));
         }
@@ -167,13 +170,15 @@ Map<String, TripRealtime> matchToTimetable(
     }
   }
 
-  (int, int, int)? byTime(RtJourney j) {
+  /// Course dont les heures prévues correspondent à celles annoncées (à 60 s près), parmi [among]
+  /// si précisé.
+  (int, int, int)? byTime(RtJourney j, [List<(int, int, int)>? among]) {
     final votes = <(int, int, int), int>{};
     for (final c in j.calls) {
       if (c.stopId == null || c.aimed == null) continue;
       final s = secOf(c.aimed!);
       for (final (sec, key) in byStop[c.stopId] ?? const <(int, (int, int, int))>[]) {
-        if ((sec - s).abs() <= 60) votes[key] = (votes[key] ?? 0) + 1;
+        if ((sec - s).abs() <= 60 && (among == null || among.contains(key))) votes[key] = (votes[key] ?? 0) + 1;
       }
     }
     if (votes.isEmpty) return null;
@@ -183,7 +188,12 @@ Map<String, TripRealtime> matchToTimetable(
   final out = <String, TripRealtime>{};
   for (final j in journeys) {
     if (!j.lineRef.contains(code)) continue;
-    final key = byNumber[j.number] ?? byTime(j);
+    final numbered = byNumber[j.number];
+    final key = numbered == null
+        ? byTime(j)
+        : numbered.length == 1
+        ? numbered.single
+        : byTime(j, numbered);
     if (key == null) continue;
     final (dir, v, t) = key;
     final variant = line.directions.firstWhere((d) => d.id == dir).variants[v];

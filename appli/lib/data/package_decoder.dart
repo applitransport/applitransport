@@ -38,8 +38,7 @@ Map<String, dynamic> readPackage(List<int> bytes) {
   return jsonDecode(utf8.decode(gz ? gzip.decode(bytes) : bytes)) as Map<String, dynamic>;
 }
 
-String _yyyymmdd(DateTime d) =>
-    '${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
+String _yyyymmdd(DateTime d) => '${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';
 
 /// Le service (jeu de jours de circulation) roule-t-il ce jour-là ?
 bool serviceActive(Map<String, dynamic> pkg, String serviceId, DateTime day) {
@@ -67,20 +66,40 @@ DateTime? lastServiceDay(Map<String, dynamic> pkg) {
   return last == null ? null : DateTime.parse(last);
 }
 
-/// Horaires d'une ligne pour un jour de service : une variante par parcours type qui roule ce
-/// jour-là, la plus fréquente en premier ; les sens sans course sont omis.
-DemoLine timetableFor(Map<String, dynamic> pkg, DateTime day) {
+/// Heures de départ d'une course à chaque arrêt (s depuis minuit de son jour de service).
+List<int> _departures(List<dynamic> t) {
+  final deps = <int>[t[3] as int];
+  for (final d in t[4] as List) {
+    deps.add(deps.last + (d as int));
+  }
+  return deps;
+}
+
+/// Horaires d'une ligne pour le jour [day], sur l'horloge de ce jour (s depuis minuit) : ses courses,
+/// plus celles de la veille qui se prolongent après minuit ([withPreviousNight]). IDFM note ces
+/// dernières après 24:00 (« 24:37 ») ; recalées de -24 h, elles apparaissent à 00:37 et les arrêts
+/// desservis avant minuit ont une heure négative. Une variante par parcours type, la plus fréquente
+/// en premier ; les sens sans course sont omis.
+DemoLine timetableFor(Map<String, dynamic> pkg, DateTime day, {bool withPreviousNight = true}) {
   if (pkg['format'] != supportedFormat) {
     throw FormatException('format de paquet ${pkg['format']} non géré (attendu $supportedFormat)');
   }
   final stops = (pkg['stops'] as Map<String, dynamic>);
   final shapes = <String, List<LatLng>>{};
   final patterns = pkg['patterns'] as List;
+  final previous = DateTime(day.year, day.month, day.day - 1);
 
-  // courses du jour, regroupées par parcours type
-  final byPattern = <int, List<List<dynamic>>>{};
+  // courses du jour (et de la nuit précédente), regroupées par parcours type : (course, heures)
+  final byPattern = <int, List<(List<dynamic>, List<int>)>>{};
   for (final t in pkg['trips'] as List) {
-    if (serviceActive(pkg, t[2], day)) byPattern.putIfAbsent(t[1] as int, () => []).add(t as List);
+    final pattern = t[1] as int;
+    if (serviceActive(pkg, t[2], day)) byPattern.putIfAbsent(pattern, () => []).add((t, _departures(t)));
+    if (withPreviousNight && serviceActive(pkg, t[2], previous)) {
+      final deps = _departures(t);
+      if (deps.last >= 86400) {
+        byPattern.putIfAbsent(pattern, () => []).add((t, [for (final d in deps) d - 86400]));
+      }
+    }
   }
 
   final directions = <Direction>[];
@@ -91,29 +110,25 @@ DemoLine timetableFor(Map<String, dynamic> pkg, DateTime day) {
     final variants = <Variant>[];
     for (final p in indexes) {
       final pattern = patterns[p];
-      final trips = byPattern[p]!..sort((a, b) => (a[3] as int).compareTo(b[3] as int));
+      final trips = byPattern[p]!..sort((a, b) => a.$2.first.compareTo(b.$2.first));
       final shapeId = pattern['shape_id'] as String?;
-      variants.add(Variant(
-        pattern['headsign'] ?? '',
-        [
-          for (final id in pattern['stops'])
-            Stop(stops[id][0], LatLng((stops[id][1] as num).toDouble(), (stops[id][2] as num).toDouble()),
-                stops[id][3] ?? id, id),
-        ],
-        shapeId == null ? const [] : shapes.putIfAbsent(shapeId, () => decodePolyline(pkg['shapes'][shapeId])),
-        [
-          for (final t in trips)
-            () {
-              // départ au 1er arrêt + écarts successifs -> départ à chaque arrêt
-              final deps = <int>[t[3] as int];
-              for (final d in t[4] as List) {
-                deps.add(deps.last + (d as int));
-              }
-              return deps;
-            }(),
-        ],
-        [for (final t in trips) t[0] as String],
-      ));
+      variants.add(
+        Variant(
+          pattern['headsign'] ?? '',
+          [
+            for (final id in pattern['stops'])
+              Stop(
+                stops[id][0],
+                LatLng((stops[id][1] as num).toDouble(), (stops[id][2] as num).toDouble()),
+                stops[id][3] ?? id,
+                id,
+              ),
+          ],
+          shapeId == null ? const [] : shapes.putIfAbsent(shapeId, () => decodePolyline(pkg['shapes'][shapeId])),
+          [for (final (_, deps) in trips) deps],
+          [for (final (t, _) in trips) t[0] as String],
+        ),
+      );
     }
     directions.add(Direction(dir, variants.first.headsign, variants));
   }
