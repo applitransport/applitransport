@@ -57,15 +57,14 @@ const typeLabels = {
 class CatalogLine {
   /// Ligne du catalogue publié par l'usine (catalog.json.gz).
   CatalogLine.fromCatalog(Map<String, dynamic> j)
-      : id = lineCode(j['route_id']),
-        name = j['short_name'],
-        longName = j['long_name'] ?? '',
-        type = j['type'],
-        network = j['network'],
-        color = readableLineColor(hexColor(j['color'])),
-        textColor = readableTextColor(hexColor(j['color']), hexColor(j['text_color'], Colors.white)),
-        size = j['size'];
-
+    : id = lineCode(j['route_id']),
+      name = j['short_name'],
+      longName = j['long_name'] ?? '',
+      type = j['type'],
+      network = j['network'],
+      color = readableLineColor(hexColor(j['color'])),
+      textColor = readableTextColor(hexColor(j['color']), hexColor(j['text_color'], Colors.white)),
+      size = j['size'];
 
   final String id, name, longName, type, network;
   final Color color, textColor;
@@ -76,11 +75,11 @@ class CatalogLine {
 
 class StopArea {
   StopArea.fromJson(Map<String, dynamic> j)
-      : id = j['id'],
-        name = j['name'],
-        town = j['town'] ?? '',
-        aliases = List<String>.from(j['aliases'] ?? const []),
-        lines = [for (final r in j['lines']) lineCode(r)];
+    : id = j['id'],
+      name = j['name'],
+      town = j['town'] ?? '',
+      aliases = List<String>.from(j['aliases'] ?? const []),
+      lines = [for (final r in j['lines']) lineCode(r)];
 
   final String id, name;
 
@@ -109,7 +108,6 @@ class Stop {
 class Variant {
   Variant(this.headsign, this.stops, this.shape, this.trips, [this.tripIds = const []]);
 
-
   final String headsign;
 
   /// Identifiant GTFS de chaque course (rattachement au temps réel) ; vide pour les données de démo.
@@ -129,7 +127,6 @@ class Direction {
   Direction(this.id, this.label, this.variants) {
     _mergeStops();
   }
-
 
   // arrêts de toutes les variantes, dans l'ordre du parcours : chaque arrêt absent de la
   // variante principale est inséré après l'arrêt qui le précède dans sa propre variante
@@ -155,7 +152,6 @@ class Direction {
 
 class DemoLine {
   DemoLine(this.id, this.name, this.type, this.color, this.textColor, this.directions);
-
 
   final String id, name, type;
   final Color color, textColor;

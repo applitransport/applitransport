@@ -48,13 +48,13 @@ class _LineScreenState extends State<LineScreen> {
 
   /// Arrêts où l'on peut monter (tous sauf les terminus d'arrivée).
   List<Stop> get _boardingStops => [
-        for (final s in direction.stops)
-          if (direction.variants.any((v) {
-            final i = v.indexOf(s.name);
-            return i >= 0 && i < v.stops.length - 1;
-          }))
-            s
-      ];
+    for (final s in direction.stops)
+      if (direction.variants.any((v) {
+        final i = v.indexOf(s.name);
+        return i >= 0 && i < v.stops.length - 1;
+      }))
+        s,
+  ];
 
   @override
   void initState() {
@@ -91,22 +91,22 @@ class _LineScreenState extends State<LineScreen> {
   }
 
   void _scrollToNextSoon() => WidgetsBinding.instance.addPostFrameCallback((_) {
-        final ctx = _nextKey.currentContext;
-        if (ctx != null) Scrollable.ensureVisible(ctx, alignment: 0.3, duration: const Duration(milliseconds: 300));
-      });
+    final ctx = _nextKey.currentContext;
+    if (ctx != null) Scrollable.ensureVisible(ctx, alignment: 0.3, duration: const Duration(milliseconds: 300));
+  });
 
   void _select({String? lineId, int? dir, String? stop}) => setState(() {
-        if (lineId != null) {
-          _lineId = lineId;
-          _dir = 0;
-          app.loadTraffic(lineId);
-        }
-        if (dir != null) _dir = dir;
-        if ((lineId != null || dir != null) && _usable) _stop = _boardingStops.first.name;
-        if (stop != null) _stop = stop;
-        _selected = null;
-        _scrollToNextSoon();
-      });
+    if (lineId != null) {
+      _lineId = lineId;
+      _dir = 0;
+      app.loadTraffic(lineId);
+    }
+    if (dir != null) _dir = dir;
+    if ((lineId != null || dir != null) && _usable) _stop = _boardingStops.first.name;
+    if (stop != null) _stop = stop;
+    _selected = null;
+    _scrollToNextSoon();
+  });
 
   List<_Passage> _passages() {
     final out = <_Passage>[];
@@ -133,26 +133,32 @@ class _LineScreenState extends State<LineScreen> {
         appBar: AppBar(title: const Text('Suivi de ligne')),
         // SafeArea : les boutons restent au-dessus de la barre de navigation Android
         body: SafeArea(
-            top: false,
-            child: line == null
-                ? _noLine(context)
-                : !_usable
-                    ? Column(children: [
-                        _selectors(context),
-                        const Expanded(child: Center(child: Text("Cette ligne ne circule pas aujourd'hui."))),
-                      ])
-                    : _body(context)),
+          top: false,
+          child: line == null
+              ? _noLine(context)
+              : !_usable
+              ? Column(
+                  children: [
+                    _selectors(context),
+                    const Expanded(child: Center(child: Text("Cette ligne ne circule pas aujourd'hui."))),
+                  ],
+                )
+              : _body(context),
+        ),
       ),
     );
   }
 
   Widget _noLine(BuildContext context) => const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('Aucune ligne préférée téléchargée.\n'
-              'Ajoutez-en dans Configuration › Lignes.', textAlign: TextAlign.center),
-        ),
-      );
+    child: Padding(
+      padding: EdgeInsets.all(24),
+      child: Text(
+        'Aucune ligne préférée téléchargée.\n'
+        'Ajoutez-en dans Configuration › Lignes.',
+        textAlign: TextAlign.center,
+      ),
+    ),
+  );
 
   Widget _body(BuildContext context) {
     final l = line!, d = direction, now = app.nowSec();
@@ -175,43 +181,47 @@ class _LineScreenState extends State<LineScreen> {
       }
     }
 
-    return Column(children: [
-      _selectors(context),
-      Expanded(
-        flex: 5,
-        child: Stack(children: [
-          LineMap(
-            key: ValueKey('${l.id}/$_dir'),
-            shapes: [for (final v in d.variants) v.shape],
-            stops: d.stops,
-            color: l.color,
-            myStop: d.stops.firstWhere((s) => s.name == _stop),
-            buses: buses,
-            onBusTap: (id) => setState(() => _selected = id),
+    return Column(
+      children: [
+        _selectors(context),
+        Expanded(
+          flex: 5,
+          child: Stack(
+            children: [
+              LineMap(
+                key: ValueKey('${l.id}/$_dir'),
+                shapes: [for (final v in d.variants) v.shape],
+                stops: d.stops,
+                color: l.color,
+                myStop: d.stops.firstWhere((s) => s.name == _stop),
+                buses: buses,
+                onBusTap: (id) => setState(() => _selected = id),
+              ),
+              // la fiche du bus choisi est posée sur la carte : les boutons ne bougent pas
+              if (_selected != null) Positioned(left: 0, right: 0, bottom: 0, child: _tripCard(context, now, selected)),
+            ],
           ),
-          // la fiche du bus choisi est posée sur la carte : les boutons ne bougent pas
-          if (_selected != null) Positioned(left: 0, right: 0, bottom: 0, child: _tripCard(context, now, selected)),
-        ]),
-      ),
-      RefreshControls(
-        // une instance par ligne : changer de ligne arrête l'auto en cours
-        key: ValueKey(l.id),
-        onRefresh: () => app.refreshLine(l.id),
-        autoMinutes: app.autoMinutes,
-        lastRefresh: refreshed,
-        now: app.now,
-        error: app.realtimeError,
-        middle: IconButton.filledTonal(
-          tooltip: _listHidden ? 'Afficher les horaires' : 'Masquer les horaires',
-          onPressed: () => setState(() {
-            _listHidden = !_listHidden;
-            if (!_listHidden) _scrollToNextSoon();
-          }),
-          icon: Icon(_listHidden ? Icons.expand_less : Icons.expand_more),
         ),
-      ),
-      if (!_listHidden) Expanded(flex: 4, child: _departures(context, now, passages, buses.length)),
-    ]);
+        RefreshControls(
+          // une instance par ligne : changer de ligne arrête l'auto en cours
+          key: ValueKey(l.id),
+          onRefresh: () => app.refreshLine(l.id),
+          autoMinutes: app.autoMinutes,
+          lastRefresh: refreshed,
+          now: app.now,
+          error: app.realtimeError,
+          middle: IconButton.filledTonal(
+            tooltip: _listHidden ? 'Afficher les horaires' : 'Masquer les horaires',
+            onPressed: () => setState(() {
+              _listHidden = !_listHidden;
+              if (!_listHidden) _scrollToNextSoon();
+            }),
+            icon: Icon(_listHidden ? Icons.expand_less : Icons.expand_more),
+          ),
+        ),
+        if (!_listHidden) Expanded(flex: 4, child: _departures(context, now, passages, buses.length)),
+      ],
+    );
   }
 
   Widget _selectors(BuildContext context) {
@@ -219,55 +229,68 @@ class _LineScreenState extends State<LineScreen> {
     final lines = {...app.preferred.where(app.hasSchedules), ?_lineId}.toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Column(children: [
-        Row(children: [
-          DropdownButton<String>(
-            value: _lineId,
-            underline: const SizedBox(),
-            items: [
-              for (final id in lines)
-                DropdownMenuItem(
-                  value: id,
-                  child: LineBadge(
-                      name: app.timetable(id)!.name,
-                      color: app.timetable(id)!.color,
-                      textColor: app.timetable(id)!.textColor),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              DropdownButton<String>(
+                value: _lineId,
+                underline: const SizedBox(),
+                items: [
+                  for (final id in lines)
+                    DropdownMenuItem(
+                      value: id,
+                      child: LineBadge(
+                        name: app.timetable(id)!.name,
+                        color: app.timetable(id)!.color,
+                        textColor: app.timetable(id)!.textColor,
+                      ),
+                    ),
+                ],
+                onChanged: (v) => _select(lineId: v),
+              ),
+              const SizedBox(width: 12),
+              if (_usable)
+                Expanded(
+                  child: DropdownButton<int>(
+                    value: _dir,
+                    isExpanded: true,
+                    items: [
+                      for (var i = 0; i < line!.directions.length; i++)
+                        DropdownMenuItem(
+                          value: i,
+                          child: Text('→ ${line!.directions[i].label}', overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                    onChanged: (v) => _select(dir: v),
+                  ),
                 ),
+              if (_lineId != null) TrafficButton(app: app, lineId: _lineId!),
             ],
-            onChanged: (v) => _select(lineId: v),
           ),
-          const SizedBox(width: 12),
           if (_usable)
-          Expanded(
-            child: DropdownButton<int>(
-              value: _dir,
-              isExpanded: true,
-              items: [
-                for (var i = 0; i < line!.directions.length; i++)
-                  DropdownMenuItem(value: i, child: Text('→ ${line!.directions[i].label}', overflow: TextOverflow.ellipsis)),
+            Row(
+              children: [
+                const Icon(Icons.place_outlined, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButton<String>(
+                    value: _stop,
+                    isExpanded: true,
+                    items: [
+                      for (final s in _boardingStops)
+                        DropdownMenuItem(
+                          value: s.name,
+                          child: Text(s.name, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                    onChanged: (v) => _select(stop: v),
+                  ),
+                ),
               ],
-              onChanged: (v) => _select(dir: v),
             ),
-          ),
-          if (_lineId != null) TrafficButton(app: app, lineId: _lineId!),
-        ]),
-        if (_usable)
-        Row(children: [
-          const Icon(Icons.place_outlined, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: DropdownButton<String>(
-              value: _stop,
-              isExpanded: true,
-              items: [
-                for (final s in _boardingStops)
-                  DropdownMenuItem(value: s.name, child: Text(s.name, overflow: TextOverflow.ellipsis)),
-              ],
-              onChanged: (v) => _select(stop: v),
-            ),
-          ),
-        ]),
-      ]),
+        ],
+      ),
     );
   }
 
@@ -292,66 +315,79 @@ class _LineScreenState extends State<LineScreen> {
       final late = (delay ?? 0) >= 90;
       final headsign = d.variants[p.variant].headsign;
       final fg = selected ? l.textColor : null;
-      chips.add(InkWell(
-        key: isNext ? _nextKey : null,
-        onTap: () => setState(() => _selected = p.id),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          width: 76,
-          padding: const EdgeInsets.symmetric(vertical: 5),
-          decoration: BoxDecoration(
-            color: selected ? l.color : (passed || cancelled ? scheme.surfaceContainerHighest : null),
-            border: Border.all(color: selected ? l.color : scheme.outlineVariant),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(children: [
-            Text(hhmm(p.time),
-                style: TextStyle(
+      chips.add(
+        InkWell(
+          key: isNext ? _nextKey : null,
+          onTap: () => setState(() => _selected = p.id),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 76,
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            decoration: BoxDecoration(
+              color: selected ? l.color : (passed || cancelled ? scheme.surfaceContainerHighest : null),
+              border: Border.all(color: selected ? l.color : scheme.outlineVariant),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  hhmm(p.time),
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: fg ?? (passed ? scheme.outline : null),
-                    decoration: passed || cancelled ? TextDecoration.lineThrough : null)),
-            Text(
-              cancelled
-                  ? 'supprimé'
-                  : passed && r != null
+                    decoration: passed || cancelled ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+                Text(
+                  cancelled
+                      ? 'supprimé'
+                      : passed && r != null
                       ? 'passé'
                       : (delay == null ? 'théorique' : '${delayLabel(delay)} ${hhmm(expected)}'),
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: cancelled ? FontWeight.bold : null,
-                color: fg ??
-                    (cancelled
-                        ? lateColor
-                        : passed
-                        ? scheme.outline
-                        : delay == null
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: cancelled ? FontWeight.bold : null,
+                    color:
+                        fg ??
+                        (cancelled
+                            ? lateColor
+                            : passed
+                            ? scheme.outline
+                            : delay == null
                             ? scheme.outline
                             : late
-                                ? lateColor
-                                : okColor),
-              ),
+                            ? lateColor
+                            : okColor),
+                  ),
+                ),
+                // destination affichée seulement quand elle diffère du sens principal
+                if (headsign != d.label)
+                  Text(
+                    '→ $headsign',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 9, color: fg ?? scheme.secondary),
+                  ),
+              ],
             ),
-            // destination affichée seulement quand elle diffère du sens principal
-            if (headsign != d.label)
-              Text('→ $headsign',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 9, color: fg ?? scheme.secondary)),
-          ]),
+          ),
         ),
-      ));
+      );
     }
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(
-          'Horaires à $_stop'
-          '${app.refreshedAt.containsKey(l.id) ? ' · $running bus en circulation dans ce sens' : ''}',
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: 6),
-        Wrap(spacing: 6, runSpacing: 6, children: chips),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Horaires à $_stop'
+            '${app.refreshedAt.containsKey(l.id) ? ' · $running bus en circulation dans ce sens' : ''}',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 6),
+          Wrap(spacing: 6, runSpacing: 6, children: chips),
+        ],
+      ),
     );
   }
 
@@ -370,11 +406,13 @@ class _LineScreenState extends State<LineScreen> {
     } else if (r.cancelled || r.cancelledStops.contains(p.index)) {
       where = 'Course supprimée${r.cancelled ? '' : ' à votre arrêt'}.';
     } else if (s != null) {
-      where = 'A passé ${v.stops[s.lastStop].name} il y a ${duration(s.sinceSec)}.\n'
+      where =
+          'A passé ${v.stops[s.lastStop].name} il y a ${duration(s.sinceSec)}.\n'
           'Prochain arrêt : ${v.stops[s.nextStop].name} dans ${duration(s.nextInSec)}.\n'
           '${s.lastStop >= p.index ? 'Déjà passé à votre arrêt.' : 'À votre arrêt dans ${duration(times[p.index] - now)} (${p.index - s.lastStop} arrêt(s)).'}';
     } else if (r.nextIndex == 0 || now < times.first) {
-      where = 'Pas encore parti de ${v.stops.first.name} (départ dans ${duration(times.first - now)}).\n'
+      where =
+          'Pas encore parti de ${v.stops.first.name} (départ dans ${duration(times.first - now)}).\n'
           'À votre arrêt dans ${duration(times[p.index] - now)}.';
     } else {
       where = 'Arrivé au terminus ${v.stops.last.name}.';
@@ -384,20 +422,29 @@ class _LineScreenState extends State<LineScreen> {
       elevation: 4,
       child: Padding(
         padding: const EdgeInsets.all(10),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Bus de ${hhmm(p.time)} → ${v.headsign} · ${delayLabel(delay)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 2),
-              Text(where),
-            ]),
-          ),
-          IconButton(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bus de ${hhmm(p.time)} → ${v.headsign} · ${delayLabel(delay)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(where),
+                ],
+              ),
+            ),
+            IconButton(
               visualDensity: VisualDensity.compact,
               onPressed: () => setState(() => _selected = null),
-              icon: const Icon(Icons.close)),
-        ]),
+              icon: const Icon(Icons.close),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -122,23 +122,30 @@ class _RefreshControlsState extends State<RefreshControls> {
     final info = last == null
         ? 'Horaires théoriques · appuyez sur Actualiser pour le temps réel'
         : 'Actualisé il y a ${duration(widget.now().difference(last).inSeconds)}'
-            '${_autoOn ? ' · prochaine requête dans ${_remaining(_nextAuto)} s' : ''}';
+              '${_autoOn ? ' · prochaine requête dans ${_remaining(_nextAuto)} s' : ''}';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Row(children: [
-          Expanded(child: manual),
-          const SizedBox(width: 8),
-          if (widget.middle != null) ...[widget.middle!, const SizedBox(width: 8)],
-          Expanded(child: auto),
-        ]),
-        const SizedBox(height: 4),
-        Text(info, style: Theme.of(context).textTheme.bodySmall),
-        if (widget.error != null)
-          Text(widget.error!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error)),
-      ]),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(child: manual),
+              const SizedBox(width: 8),
+              if (widget.middle != null) ...[widget.middle!, const SizedBox(width: 8)],
+              Expanded(child: auto),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(info, style: Theme.of(context).textTheme.bodySmall),
+          if (widget.error != null)
+            Text(
+              widget.error!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.error),
+            ),
+        ],
+      ),
     );
   }
 }

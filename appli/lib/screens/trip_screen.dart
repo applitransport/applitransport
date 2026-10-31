@@ -39,6 +39,7 @@ class _TripScreenState extends State<TripScreen> {
   late final List<StopArea> _boardingAreas = _computeBoardingAreas();
 
   AppState get app => widget.app;
+
   /// Lignes qui passent par la zone de départ (d'après le catalogue), téléchargées ou non.
   List<String> get _originLines => _origin?.lines ?? const [];
 
@@ -70,19 +71,23 @@ class _TripScreenState extends State<TripScreen> {
       }
     }
     ids.remove(_origin!.id);
-    return [for (final id in ids) if (app.stopAreas[id] != null) app.stopAreas[id]!]
-      ..sort((a, b) => a.label.compareTo(b.label));
+    return [
+      for (final id in ids)
+        if (app.stopAreas[id] != null) app.stopAreas[id]!,
+    ]..sort((a, b) => a.label.compareTo(b.label));
   }
 
   /// Lignes reliant directement les deux zones.
   List<DemoLine> get _connecting => [
-        for (final l in _originTimetables)
-          if (l.directions.any((d) => d.variants.any((v) {
-                final i = v.indexOfArea(_origin!.id);
-                return i >= 0 && v.indexOfArea(_destination!.id, i + 1) > i;
-              })))
-            l
-      ];
+    for (final l in _originTimetables)
+      if (l.directions.any(
+        (d) => d.variants.any((v) {
+          final i = v.indexOfArea(_origin!.id);
+          return i >= 0 && v.indexOfArea(_destination!.id, i + 1) > i;
+        }),
+      ))
+        l,
+  ];
 
   TripRealtime? _rt(_Journey j) => app.rt(j.line.id, j.direction.id, j.variantIndex, j.trip);
   int? _knownDelay(_Journey j) => _rt(j)?.delayAt(j.from);
@@ -133,116 +138,149 @@ class _TripScreenState extends State<TripScreen> {
         final missing = <CatalogLine>[
           if (ready)
             for (final id in _origin!.lines)
-              if (!app.hasSchedules(id) && _destination!.lines.contains(id) && app.line(id) != null) app.line(id)!
+              if (!app.hasSchedules(id) && _destination!.lines.contains(id) && app.line(id) != null) app.line(id)!,
         ];
         final journeys = ready ? _journeys(downloaded, now) : <_Journey>[];
-        final refreshed = downloaded.map((l) => app.refreshedAt[l.id]).whereType<DateTime>().fold<DateTime?>(
-            null, (a, b) => a == null || b.isBefore(a) ? b : a);
+        final refreshed = downloaded
+            .map((l) => app.refreshedAt[l.id])
+            .whereType<DateTime>()
+            .fold<DateTime?>(null, (a, b) => a == null || b.isBefore(a) ? b : a);
         return Scaffold(
           appBar: AppBar(title: const Text('Arrêt → destination')),
-          body: Column(children: [
-            _fields(context),
-            if (ready && missing.isNotEmpty) _missingBanner(context, missing),
-            if (ready && downloaded.isNotEmpty)
-              RefreshControls(
-                key: ValueKey('${_origin!.id}>${_destination!.id}'),
-                // une seule requête « arrêt » donne les passages de toutes les lignes au départ
-                onRefresh: () => app.refreshStop(_origin!.id, downloaded.map((l) => l.id)),
-                autoMinutes: app.autoMinutes,
-                lastRefresh: refreshed,
-                now: app.now,
-                error: app.realtimeError,
-              ),
-            // perturbations en cours sur les lignes du trajet (chargées une fois par quart d'heure)
-            if (ready && downloaded.isNotEmpty) _trafficRow(downloaded),
-            const Divider(height: 1),
-            Expanded(child: _results(context, ready, downloaded.isEmpty, journeys, now)),
-          ]),
+          body: Column(
+            children: [
+              _fields(context),
+              if (ready && missing.isNotEmpty) _missingBanner(context, missing),
+              if (ready && downloaded.isNotEmpty)
+                RefreshControls(
+                  key: ValueKey('${_origin!.id}>${_destination!.id}'),
+                  // une seule requête « arrêt » donne les passages de toutes les lignes au départ
+                  onRefresh: () => app.refreshStop(_origin!.id, downloaded.map((l) => l.id)),
+                  autoMinutes: app.autoMinutes,
+                  lastRefresh: refreshed,
+                  now: app.now,
+                  error: app.realtimeError,
+                ),
+              // perturbations en cours sur les lignes du trajet (chargées une fois par quart d'heure)
+              if (ready && downloaded.isNotEmpty) _trafficRow(downloaded),
+              const Divider(height: 1),
+              Expanded(child: _results(context, ready, downloaded.isEmpty, journeys, now)),
+            ],
+          ),
         );
       },
     );
   }
 
   Widget _fields(BuildContext context) {
-    Widget field(String label, IconData icon, List<StopArea> options, StopArea? value, void Function(StopArea?) onSet) =>
-        Autocomplete<StopArea>(
-          initialValue: TextEditingValue(text: value?.label ?? ''),
-          displayStringForOption: (a) => a.label,
-          optionsBuilder: (v) {
-            return searchStopAreas(options, v.text);
-          },
-          optionsViewBuilder: (context, onSelected, options) => Align(
-            alignment: Alignment.topLeft,
-            child: Material(
-              elevation: 4,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 280, maxWidth: 360),
-                child: ListView(shrinkWrap: true, padding: EdgeInsets.zero, children: [
-                  for (final a in options)
-                    ListTile(
-                      dense: true,
-                      title: Text(a.label),
-                      // plusieurs zones portent le même nom (« Le Hameau ») : le réseau aide à choisir
-                      subtitle: Text([
+    Widget field(
+      String label,
+      IconData icon,
+      List<StopArea> options,
+      StopArea? value,
+      void Function(StopArea?) onSet,
+    ) => Autocomplete<StopArea>(
+      initialValue: TextEditingValue(text: value?.label ?? ''),
+      displayStringForOption: (a) => a.label,
+      optionsBuilder: (v) {
+        return searchStopAreas(options, v.text);
+      },
+      optionsViewBuilder: (context, onSelected, options) => Align(
+        alignment: Alignment.topLeft,
+        child: Material(
+          elevation: 4,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 280, maxWidth: 360),
+            child: ListView(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              children: [
+                for (final a in options)
+                  ListTile(
+                    dense: true,
+                    title: Text(a.label),
+                    // plusieurs zones portent le même nom (« Le Hameau ») : le réseau aide à choisir
+                    subtitle: Text(
+                      [
                         if (a.town.isNotEmpty) a.town,
                         '${a.lines.length} ligne(s)',
-                        ...{for (final id in a.lines) app.networks[app.line(id)?.network] ?? ''}.where((n) => n.isNotEmpty).take(2),
-                      ].join(' · ')),
-                      onTap: () => onSelected(a),
+                        ...{
+                          for (final id in a.lines) app.networks[app.line(id)?.network] ?? '',
+                        }.where((n) => n.isNotEmpty).take(2),
+                      ].join(' · '),
                     ),
-                ]),
-              ),
+                    onTap: () => onSelected(a),
+                  ),
+              ],
             ),
           ),
-          onSelected: onSet,
-          fieldViewBuilder: (context, ctrl, focus, onSubmit) => TextField(
-            controller: ctrl,
-            focusNode: focus,
-            decoration: InputDecoration(
-              labelText: label,
-              prefixIcon: Icon(icon),
-              isDense: true,
-              border: const OutlineInputBorder(),
-              suffixIcon: ctrl.text.isEmpty
-                  ? null
-                  : IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        ctrl.clear();
-                        onSet(null);
-                      }),
-            ),
-          ),
-        );
+        ),
+      ),
+      onSelected: onSet,
+      fieldViewBuilder: (context, ctrl, focus, onSubmit) => TextField(
+        controller: ctrl,
+        focusNode: focus,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+          isDense: true,
+          border: const OutlineInputBorder(),
+          suffixIcon: ctrl.text.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    ctrl.clear();
+                    onSet(null);
+                  },
+                ),
+        ),
+      ),
+    );
 
     return Padding(
       key: _fieldsKey,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      child: Row(children: [
-        Expanded(
-          child: Column(children: [
-            field('Arrêt de départ', Icons.trip_origin, _boardingAreas, _origin, (v) => setState(() {
-                  _origin = v;
-                  if (!_destinations.contains(_destination)) _destination = null;
-                })),
-            const SizedBox(height: 8),
-            field("Arrêt d'arrivée", Icons.place, _destinations, _destination,
-                (v) => setState(() => _destination = v)),
-          ]),
-        ),
-        IconButton(
-          tooltip: 'Inverser',
-          icon: const Icon(Icons.swap_vert),
-          onPressed: _origin == null || _destination == null
-              ? null
-              : () => setState(() {
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              children: [
+                field(
+                  'Arrêt de départ',
+                  Icons.trip_origin,
+                  _boardingAreas,
+                  _origin,
+                  (v) => setState(() {
+                    _origin = v;
+                    if (!_destinations.contains(_destination)) _destination = null;
+                  }),
+                ),
+                const SizedBox(height: 8),
+                field(
+                  "Arrêt d'arrivée",
+                  Icons.place,
+                  _destinations,
+                  _destination,
+                  (v) => setState(() => _destination = v),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Inverser',
+            icon: const Icon(Icons.swap_vert),
+            onPressed: _origin == null || _destination == null
+                ? null
+                : () => setState(() {
                     final o = _origin;
                     _origin = _destination;
                     _destination = _destinations.contains(o) ? o : null;
                     _fieldsKey = UniqueKey(); // recrée les champs avec les nouvelles valeurs
                   }),
-        ),
-      ]),
+          ),
+        ],
+      ),
     );
   }
 
@@ -265,26 +303,35 @@ class _TripScreenState extends State<TripScreen> {
       color: Theme.of(context).colorScheme.secondaryContainer,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-        child: Row(children: [
-          Expanded(
-            child: Wrap(spacing: 4, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              Text('${missing.length} autre(s) ligne(s) directe(s) non téléchargée(s) :'),
-              for (final l in missing) LineBadge(name: l.name, color: l.color, textColor: l.textColor, small: true),
-            ]),
-          ),
-          busy
-              ? const Padding(
-                  padding: EdgeInsets.all(8), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator()))
-              : TextButton.icon(
-                  onPressed: () {
-                    for (final l in missing) {
-                      app.download(l.id);
-                    }
-                  },
-                  icon: const Icon(Icons.download),
-                  label: const Text('Ajouter'),
-                ),
-        ]),
+        child: Row(
+          children: [
+            Expanded(
+              child: Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text('${missing.length} autre(s) ligne(s) directe(s) non téléchargée(s) :'),
+                  for (final l in missing) LineBadge(name: l.name, color: l.color, textColor: l.textColor, small: true),
+                ],
+              ),
+            ),
+            busy
+                ? const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator()),
+                  )
+                : TextButton.icon(
+                    onPressed: () {
+                      for (final l in missing) {
+                        app.download(l.id);
+                      }
+                    },
+                    icon: const Icon(Icons.download),
+                    label: const Text('Ajouter'),
+                  ),
+          ],
+        ),
       ),
     );
   }
@@ -292,7 +339,8 @@ class _TripScreenState extends State<TripScreen> {
   Widget _results(BuildContext context, bool ready, bool nothingDownloaded, List<_Journey> journeys, int now) {
     String? message;
     if (!ready) {
-      message = "Choisissez un arrêt de départ puis un arrêt d'arrivée.\n"
+      message =
+          "Choisissez un arrêt de départ puis un arrêt d'arrivée.\n"
           'Seuls les trajets directs (sans correspondance) sont proposés.';
     } else if (nothingDownloaded) {
       message = 'Aucune ligne téléchargée ne fait ce trajet.\nAjoutez celles proposées ci-dessus.';
@@ -300,7 +348,12 @@ class _TripScreenState extends State<TripScreen> {
       message = 'Aucun bus direct dans les 2 prochaines heures.';
     }
     if (message != null) {
-      return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(message, textAlign: TextAlign.center)));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(message, textAlign: TextAlign.center),
+        ),
+      );
     }
     final scheme = Theme.of(context).colorScheme;
     return ListView.separated(
@@ -317,24 +370,38 @@ class _TripScreenState extends State<TripScreen> {
         return ListTile(
           onTap: () => _showBus(context, j),
           leading: LineBadge(name: j.line.name, color: j.line.color, textColor: j.line.textColor),
-          title: Text('${hhmm(dep)} → ${hhmm(arr)}  (${duration(arr - dep)})',
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+          title: Text(
+            '${hhmm(dep)} → ${hhmm(arr)}  (${duration(arr - dep)})',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
           // le quai précis compte dans une grande zone comme une gare
-          subtitle: Text('Direction ${j.variant.headsign}\nDépart : ${j.variant.stops[j.from].name}'
-              '${delay != null && delay.abs() >= 60 ? ' · prévu ${hhmm(j.variant.trips[j.trip][j.from])}' : ''}'),
+          subtitle: Text(
+            'Direction ${j.variant.headsign}\nDépart : ${j.variant.stops[j.from].name}'
+            '${delay != null && delay.abs() >= 60 ? ' · prévu ${hhmm(j.variant.trips[j.trip][j.from])}' : ''}',
+          ),
           isThreeLine: true,
-          trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(dep <= now ? 'à quai' : 'dans ${duration(dep - now)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(cancelled ? 'supprimé' : delayLabel(delay),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                dep <= now ? 'à quai' : 'dans ${duration(dep - now)}',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text(
+                cancelled ? 'supprimé' : delayLabel(delay),
                 style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: cancelled ? FontWeight.bold : null,
-                    color: cancelled || late
-                        ? Colors.red.shade400
-                        : delay == null
-                            ? scheme.outline
-                            : Colors.green.shade500)),
-          ]),
+                  fontSize: 12,
+                  fontWeight: cancelled ? FontWeight.bold : null,
+                  color: cancelled || late
+                      ? Colors.red.shade400
+                      : delay == null
+                      ? scheme.outline
+                      : Colors.green.shade500,
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -353,35 +420,37 @@ class _TripScreenState extends State<TripScreen> {
           final s = busStatus(j.variant, j.trip, now, r);
           final text = r == null
               ? (app.refreshedAt.containsKey(j.line.id)
-                  ? 'PRIM ne donne pas d\'information sur ce bus : horaire théorique.'
-                  : 'Appuyez sur Actualiser pour savoir où est ce bus.')
+                    ? 'PRIM ne donne pas d\'information sur ce bus : horaire théorique.'
+                    : 'Appuyez sur Actualiser pour savoir où est ce bus.')
               : r.cancelled
-                  ? 'Course supprimée.'
-                  : s == null
-                  ? 'Pas encore parti de ${j.variant.stops.first.name}.'
-                  : 'A passé ${j.variant.stops[s.lastStop].name} il y a ${duration(s.sinceSec)} · '
-                      'prochain arrêt ${j.variant.stops[s.nextStop].name}.';
+              ? 'Course supprimée.'
+              : s == null
+              ? 'Pas encore parti de ${j.variant.stops.first.name}.'
+              : 'A passé ${j.variant.stops[s.lastStop].name} il y a ${duration(s.sinceSec)} · '
+                    'prochain arrêt ${j.variant.stops[s.nextStop].name}.';
           return SizedBox(
             height: MediaQuery.of(context).size.height * 0.6,
-            child: Column(children: [
-              ListTile(
-                leading: LineBadge(name: j.line.name, color: j.line.color, textColor: j.line.textColor),
-                title: Text('→ ${j.variant.headsign} · ${delayLabel(delay)}'),
-                subtitle: Text(text),
-              ),
-              Expanded(
-                child: LineMap(
-                  shapes: [j.variant.shape],
-                  stops: j.variant.stops,
-                  color: j.line.color,
-                  myStop: j.variant.stops[j.from],
-                  buses: [
-                    if (delay != null && s != null)
-                      MapBus(id: '${j.trip}', position: s.position, selected: true, realtime: true),
-                  ],
+            child: Column(
+              children: [
+                ListTile(
+                  leading: LineBadge(name: j.line.name, color: j.line.color, textColor: j.line.textColor),
+                  title: Text('→ ${j.variant.headsign} · ${delayLabel(delay)}'),
+                  subtitle: Text(text),
                 ),
-              ),
-            ]),
+                Expanded(
+                  child: LineMap(
+                    shapes: [j.variant.shape],
+                    stops: j.variant.stops,
+                    color: j.line.color,
+                    myStop: j.variant.stops[j.from],
+                    buses: [
+                      if (delay != null && s != null)
+                        MapBus(id: '${j.trip}', position: s.position, selected: true, realtime: true),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),

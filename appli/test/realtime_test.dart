@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:applitransport/data/package_decoder.dart';
+import 'package:applitransport/data/paris_time.dart';
 import 'package:applitransport/data/realtime.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,7 +20,7 @@ void main() {
 
   test('bus 5104 : rattachement par numéro de course', () {
     final data = json('prim_et_5104_1022.json');
-    final now = DateTime.parse(data['Siri']['ServiceDelivery']['ResponseTimestamp']).toLocal();
+    final now = parisTime(DateTime.parse(data['Siri']['ServiceDelivery']['ResponseTimestamp']));
     final line = timetableFor(readPackage(File('test/fixtures/C01527.json.gz').readAsBytesSync()), day);
     final journeys = parseEstimatedTimetable(data);
     expect(journeys.length, 12);
@@ -37,7 +38,7 @@ void main() {
 
   test('train N : rattachement par arrêt et heure prévue (identifiants SNCF)', () {
     final data = json('prim_et_N_1359.json');
-    final now = DateTime.parse(data['Siri']['ServiceDelivery']['ResponseTimestamp']).toLocal();
+    final now = parisTime(DateTime.parse(data['Siri']['ServiceDelivery']['ResponseTimestamp']));
     final line = timetableFor(readPackage(File('test/fixtures/C01736.json.gz').readAsBytesSync()), day);
     final journeys = parseEstimatedTimetable(data);
     expect(journeys.length, 24);
@@ -52,7 +53,7 @@ void main() {
 
   test('train N supprimé (17 h 34) : statut CANCELLED à chaque arrêt, sans indicateur Cancellation', () {
     final data = json('prim_et_N_1734_train_supprime.json');
-    final now = DateTime.parse(data['Siri']['ServiceDelivery']['ResponseTimestamp']).toLocal();
+    final now = parisTime(DateTime.parse(data['Siri']['ServiceDelivery']['ResponseTimestamp']));
     final journeys = parseEstimatedTimetable(data);
     expect(journeys.any((j) => j.cancelled), isFalse); // la SNCF ne remplit pas l'indicateur de course
     final rt = matchToTimetable(trainN, journeys, day, now, remaining: true);
@@ -63,7 +64,7 @@ void main() {
 
   test('train N non mis à jour depuis longtemps mais en route : gardé ; trains arrivés : écartés', () {
     final data = json('prim_et_N_1855_maj_ancienne.json');
-    final now = DateTime.parse(data['Siri']['ServiceDelivery']['ResponseTimestamp']).toLocal();
+    final now = parisTime(DateTime.parse(data['Siri']['ServiceDelivery']['ResponseTimestamp']));
     final journeys = parseEstimatedTimetable(data);
     // la SNCF ne met à jour une course que si elle change : l'ancienneté ne prouve pas un fantôme
     final live = journeys.where((j) => j.calls.any((c) => c.expected != null && c.expected!.isAfter(now))).length;

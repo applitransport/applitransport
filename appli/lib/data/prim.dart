@@ -15,6 +15,7 @@ const primKinds = {
   'calculateur': 'recherche d\'itinéraire et d\'adresse',
   'trafic': 'perturbations (Info Trafic)',
 };
+
 /// Quotas PRIM par jour (compte gratuit), et garde-fou de l'appli un peu en dessous.
 const primQuota = {'ligne': 1000, 'arrêt': 1000, 'calculateur': 1000, 'trafic': 4000};
 const primDailyLimit = {'ligne': 900, 'arrêt': 900, 'calculateur': 900, 'trafic': 3600};
@@ -82,9 +83,9 @@ class PrimClient {
     usage.count(kind);
     final http.Response r;
     try {
-      r = await _client.get(uri, headers: {'apikey': token(), 'Accept': 'application/json'}).timeout(
-            const Duration(seconds: 15),
-          );
+      r = await _client
+          .get(uri, headers: {'apikey': token(), 'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 15));
     } on SocketException {
       throw PrimException('pas de connexion internet');
     } catch (e) {
@@ -114,10 +115,10 @@ class PrimClient {
 
   /// Recherche d'adresses et d'arrêts (calculateur).
   Future<Map<String, dynamic>> places(String query) => _get('calculateur', 'v2/navitia/places', {
-        'q': query,
-        'type[]': ['address', 'stop_area'],
-        'count': '8',
-      });
+    'q': query,
+    'type[]': ['address', 'stop_area'],
+    'count': '8',
+  });
 
   /// Itinéraires entre deux lieux (identifiants Navitia ou « lon;lat ») ; [arrival] : arriver avant [when].
   Future<Map<String, dynamic>> journeys(String from, String to, DateTime when, {bool arrival = false}) {

@@ -7,7 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 // Perturbations réelles de la ligne N relevées par la surveillance le 29/10/2026.
 void main() {
   test('nettoyage du HTML des messages', () {
-    expect(cleanHtml('<p>P&#233;riode : de soir&#233;e.<br><br>Dates&nbsp;: lundi</p>'), 'Période : de soirée.\nDates : lundi');
+    expect(
+      cleanHtml('<p>P&#233;riode : de soir&#233;e.<br><br>Dates&nbsp;: lundi</p>'),
+      'Période : de soirée.\nDates : lundi',
+    );
   });
 
   test('Info Trafic de la N : classement, dédoublonnage, périodes', () {
@@ -23,11 +26,13 @@ void main() {
     expect(lifts.every((d) => d.stopAreas.isNotEmpty), isTrue);
     expect(list.every((d) => d.title.isNotEmpty && !d.text.contains('&#')), isTrue);
     // travaux de nuit (00:38 → 02:59) du 26 au 30/10 : en cours la nuit du 30, pas à midi
-    final tonight = works.where((d) => d.activeAt(DateTime(2026, 10, 30, 1))).toList();
+    final tonight = works.where((d) => d.activeAt(DateTime.utc(2026, 10, 30, 1))).toList();
     expect(tonight, isNotEmpty);
-    expect(tonight.any((d) => d.activeAt(DateTime(2026, 10, 29, 12))), isFalse);
+    expect(tonight.any((d) => d.activeAt(DateTime.utc(2026, 10, 29, 12))), isFalse);
     // ignore: avoid_print
-    print('${list.length} perturbations (sur $raw), ${works.length} travaux, ${lifts.length} ascenseurs ; '
-        'nuit du 30/10 à 1 h : ${tonight.map((d) => d.title).join(' | ')}');
+    print(
+      '${list.length} perturbations (sur $raw), ${works.length} travaux, ${lifts.length} ascenseurs ; '
+      'nuit du 30/10 à 1 h : ${tonight.map((d) => d.title).join(' | ')}',
+    );
   });
 }

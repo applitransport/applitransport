@@ -16,10 +16,10 @@ class LocalLine {
   LocalLine(this.version, this.downloadedAt, this.size, this.until);
 
   LocalLine.fromJson(Map<String, dynamic> j)
-      : version = j['version'],
-        downloadedAt = DateTime.parse(j['downloaded_at']),
-        size = j['size'],
-        until = j['until'] == null ? null : DateTime.parse(j['until']);
+    : version = j['version'],
+      downloadedAt = DateTime.parse(j['downloaded_at']),
+      size = j['size'],
+      until = j['until'] == null ? null : DateTime.parse(j['until']);
 
   final String version;
   final DateTime downloadedAt;
@@ -29,11 +29,11 @@ class LocalLine {
   final DateTime? until;
 
   Map<String, dynamic> toJson() => {
-        'version': version,
-        'downloaded_at': downloadedAt.toIso8601String(),
-        'size': size,
-        'until': until?.toIso8601String(),
-      };
+    'version': version,
+    'downloaded_at': downloadedAt.toIso8601String(),
+    'size': size,
+    'until': until?.toIso8601String(),
+  };
 }
 
 class Repository {
@@ -63,6 +63,7 @@ class Repository {
     _lines = [for (final l in c?['lines'] ?? const []) l as Map<String, dynamic>];
     _byCode = {for (final l in _lines) (l['route_id'] as String).split(':').last: l};
   }
+
   DateTime? lastCheck;
   String? _etag, _lastModified;
 
@@ -91,12 +92,14 @@ class Repository {
 
   Future<void> _writeIndex() async {
     final tmp = File('${_indexFile.path}.tmp');
-    await tmp.writeAsString(jsonEncode({
-      'etag': _etag,
-      'last_modified': _lastModified,
-      'last_check': lastCheck?.toIso8601String(),
-      'lines': {for (final e in local.entries) e.key: e.value.toJson()},
-    }));
+    await tmp.writeAsString(
+      jsonEncode({
+        'etag': _etag,
+        'last_modified': _lastModified,
+        'last_check': lastCheck?.toIso8601String(),
+        'lines': {for (final e in local.entries) e.key: e.value.toJson()},
+      }),
+    );
     await tmp.rename(_indexFile.path); // remplacement atomique
   }
 
@@ -141,7 +144,11 @@ class Repository {
 
   /// Télécharge plusieurs lignes en parallèle ([parallel] à la fois). L'index est enregistré toutes
   /// les 100 lignes et à la fin : une interruption ne fait perdre que les dernières.
-  Future<void> downloadMany(List<String> codes, {void Function(int done, int total)? onProgress, int parallel = 6}) async {
+  Future<void> downloadMany(
+    List<String> codes, {
+    void Function(int done, int total)? onProgress,
+    int parallel = 6,
+  }) async {
     var done = 0;
     final queue = [...codes];
     Future<void> worker() async {
@@ -169,12 +176,15 @@ class Repository {
 
   /// Lignes téléchargées dont le catalogue annonce une nouvelle version.
   List<String> get outdated => [
-        for (final e in local.entries)
-          if (_byCode[e.key] != null && _byCode[e.key]!['version'] != e.value.version) e.key
-      ];
+    for (final e in local.entries)
+      if (_byCode[e.key] != null && _byCode[e.key]!['version'] != e.value.version) e.key,
+  ];
 
   /// Lignes téléchargées qui ont disparu du catalogue (ligne supprimée du réseau).
-  List<String> get vanished => [for (final code in local.keys) if (catalog != null && catalogLine(code) == null) code];
+  List<String> get vanished => [
+    for (final code in local.keys)
+      if (catalog != null && catalogLine(code) == null) code,
+  ];
 
   Future<Map<String, dynamic>> readLine(String code) async => readPackage(await _lineFile(code).readAsBytes());
 

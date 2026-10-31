@@ -37,9 +37,11 @@ void writeCatalog(Directory pub, Map<String, String> versions) {
         'file': 'lines/${e.key}.json.gz',
         'version': e.value,
         'size': File('${pub.path}/lines/${e.key}.json.gz').lengthSync(),
-      }
+      },
   ];
-  File('${pub.path}/catalog.json.gz').writeAsBytesSync(gzip.encode(utf8.encode(jsonEncode({'format': 1, 'lines': lines}))));
+  File(
+    '${pub.path}/catalog.json.gz',
+  ).writeAsBytesSync(gzip.encode(utf8.encode(jsonEncode({'format': 1, 'lines': lines}))));
 }
 
 void main() {

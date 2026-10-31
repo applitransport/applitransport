@@ -10,9 +10,11 @@ class LineBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.symmetric(horizontal: small ? 5 : 8, vertical: small ? 1 : 3),
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
-        child: Text(name,
-            style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: small ? 12 : 14)),
-      );
+    padding: EdgeInsets.symmetric(horizontal: small ? 5 : 8, vertical: small ? 1 : 3),
+    decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+    child: Text(
+      name,
+      style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: small ? 12 : 14),
+    ),
+  );
 }

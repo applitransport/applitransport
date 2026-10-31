@@ -29,15 +29,35 @@ class Disruption {
   DateTime? get firstStart => periods.isEmpty ? null : periods.map((p) => p.$1).reduce((a, b) => a.isBefore(b) ? a : b);
 }
 
-/// « 20261029T150900 » (heure de Paris) → DateTime
+/// « 20261029T150900 » (heure de Paris) → DateTime, dans la convention de data/paris_time.dart
 DateTime? navitiaTime(String? s) {
   if (s == null || s.length < 15) return null;
-  return DateTime(int.parse(s.substring(0, 4)), int.parse(s.substring(4, 6)), int.parse(s.substring(6, 8)),
-      int.parse(s.substring(9, 11)), int.parse(s.substring(11, 13)), int.parse(s.substring(13, 15)));
+  return DateTime.utc(
+    int.parse(s.substring(0, 4)),
+    int.parse(s.substring(4, 6)),
+    int.parse(s.substring(6, 8)),
+    int.parse(s.substring(9, 11)),
+    int.parse(s.substring(11, 13)),
+    int.parse(s.substring(13, 15)),
+  );
 }
 
-const _entities = {'amp': '&', 'lt': '<', 'gt': '>', 'quot': '"', 'apos': "'", 'nbsp': ' ', 'rsquo': '’', 'eacute': 'é',
-  'egrave': 'è', 'agrave': 'à', 'ccedil': 'ç', 'ecirc': 'ê', 'laquo': '«', 'raquo': '»'};
+const _entities = {
+  'amp': '&',
+  'lt': '<',
+  'gt': '>',
+  'quot': '"',
+  'apos': "'",
+  'nbsp': ' ',
+  'rsquo': '’',
+  'eacute': 'é',
+  'egrave': 'è',
+  'agrave': 'à',
+  'ccedil': 'ç',
+  'ecirc': 'ê',
+  'laquo': '«',
+  'raquo': '»',
+};
 
 /// Texte HTML des messages → texte simple (sauts de ligne gardés).
 String cleanHtml(String html) {
@@ -70,16 +90,18 @@ List<Disruption> parseLineReports(Map<String, dynamic> data) {
     final cause = (d['cause'] ?? '').toString().toLowerCase();
     final title = _message(d, (c) => (c['types'] as List? ?? const []).contains('title'));
     final text = _message(d, (c) => c['name'] == 'moteur' || (c['types'] as List? ?? const []).contains('web'));
-    final kind = tags.any((t) => t.contains('ascenseur') || t.contains('escalator')) || title.toLowerCase().contains('ascenseur')
+    final kind =
+        tags.any((t) => t.contains('ascenseur') || t.contains('escalator')) || title.toLowerCase().contains('ascenseur')
         ? DisruptionKind.accessibility
         : cause.contains('travaux')
-            ? DisruptionKind.works
-            : DisruptionKind.incident;
+        ? DisruptionKind.works
+        : DisruptionKind.incident;
     final objects = [for (final o in (d['impacted_objects'] ?? const []) as List) o['pt_object'] ?? const {}];
     final key = '$title|$text';
     final periods = [
       for (final p in (d['application_periods'] ?? const []) as List)
-        if (navitiaTime(p['begin']) != null && navitiaTime(p['end']) != null) (navitiaTime(p['begin'])!, navitiaTime(p['end'])!)
+        if (navitiaTime(p['begin']) != null && navitiaTime(p['end']) != null)
+          (navitiaTime(p['begin'])!, navitiaTime(p['end'])!),
     ];
     final previous = out[key];
     out[key] = Disruption(

@@ -37,13 +37,15 @@ class SettingsStore {
 
   Future<void> save() async {
     final tmp = File('${_file.path}.tmp');
-    await tmp.writeAsString(jsonEncode({
-      'token': token,
-      'auto_minutes': autoMinutes,
-      'theme': themeMode.name,
-      'preferred': preferred,
-      'data_url': dataUrl,
-    }));
+    await tmp.writeAsString(
+      jsonEncode({
+        'token': token,
+        'auto_minutes': autoMinutes,
+        'theme': themeMode.name,
+        'preferred': preferred,
+        'data_url': dataUrl,
+      }),
+    );
     await tmp.rename(_file.path);
   }
 }

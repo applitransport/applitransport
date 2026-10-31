@@ -46,8 +46,10 @@ LatLng _pointAt(Variant d, double meters) {
     if (g.cum[i] >= meters) {
       final seg = g.cum[i] - g.cum[i - 1];
       final f = seg == 0 ? 0.0 : (meters - g.cum[i - 1]) / seg;
-      return LatLng(pts[i - 1].latitude + (pts[i].latitude - pts[i - 1].latitude) * f,
-          pts[i - 1].longitude + (pts[i].longitude - pts[i - 1].longitude) * f);
+      return LatLng(
+        pts[i - 1].latitude + (pts[i].latitude - pts[i - 1].latitude) * f,
+        pts[i - 1].longitude + (pts[i].longitude - pts[i - 1].longitude) * f,
+      );
     }
   }
   return pts.last;
@@ -67,8 +69,9 @@ class BusStatus {
 }
 
 /// Heures de passage d'une course, corrigées du retard à chaque arrêt quand le temps réel est connu.
-List<int> tripTimes(Variant d, int trip, TripRealtime? rt) =>
-    [for (var i = 0; i < d.trips[trip].length; i++) d.trips[trip][i] + (rt?.delayAt(i) ?? 0)];
+List<int> tripTimes(Variant d, int trip, TripRealtime? rt) => [
+  for (var i = 0; i < d.trips[trip].length; i++) d.trips[trip][i] + (rt?.delayAt(i) ?? 0),
+];
 
 /// État d'une course en circulation à l'instant nowSec, ou null si elle n'a pas démarré ou est terminée.
 /// Avec la requête « ligne », PRIM indique le prochain arrêt : le bus est placé avant lui.
@@ -101,11 +104,12 @@ BusStatus? busStatus(Variant d, int trip, int nowSec, TripRealtime? rt) {
     pos = LatLng(a.latitude + (b.latitude - a.latitude) * f, a.longitude + (b.longitude - a.longitude) * f);
   }
   return BusStatus(
-      position: pos,
-      lastStop: i,
-      sinceSec: max(0, nowSec - times[i]),
-      nextStop: i + 1,
-      nextInSec: max(0, times[i + 1] - nowSec));
+    position: pos,
+    lastStop: i,
+    sinceSec: max(0, nowSec - times[i]),
+    nextStop: i + 1,
+    nextInSec: max(0, times[i + 1] - nowSec),
+  );
 }
 
 String hhmm(int sec) {

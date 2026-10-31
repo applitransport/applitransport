@@ -132,7 +132,7 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
     try {
       final n = app.now();
       final t = _time ?? TimeOfDay.fromDateTime(n);
-      final when = _when == 0 ? n : DateTime(n.year, n.month, n.day, t.hour, t.minute);
+      final when = _when == 0 ? n : DateTime.utc(n.year, n.month, n.day, t.hour, t.minute); // heure de Paris
       final s = await app.searchJourneys(await _resolve(_from!), await _resolve(_to!), when, arrival: _when == 2);
       setState(() {
         _search = s;
@@ -164,25 +164,27 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
         appBar: AppBar(title: const Text('Itinéraire')),
         body: SafeArea(
           top: false,
-          child: Column(children: [
-            _form(context),
-            if (_search != null && _search!.journeys.isNotEmpty)
-              RefreshControls(
-                key: ValueKey(_search),
-                onRefresh: _refresh,
-                autoMinutes: app.autoMinutes,
-                lastRefresh: _refreshedAt,
-                now: app.now,
-                error: app.realtimeError,
-              ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-                child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              ),
-            const Divider(height: 1),
-            Expanded(child: _results(context)),
-          ]),
+          child: Column(
+            children: [
+              _form(context),
+              if (_search != null && _search!.journeys.isNotEmpty)
+                RefreshControls(
+                  key: ValueKey(_search),
+                  onRefresh: _refresh,
+                  autoMinutes: app.autoMinutes,
+                  lastRefresh: _refreshedAt,
+                  now: app.now,
+                  error: app.realtimeError,
+                ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                  child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                ),
+              const Divider(height: 1),
+              Expanded(child: _results(context)),
+            ],
+          ),
         ),
       ),
     );
@@ -193,62 +195,76 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
     return Padding(
       key: _fieldsKey,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      child: Column(children: [
-        Row(children: [
-          Expanded(
-            child: Column(children: [
-              _PlaceField(app: app, label: 'Départ', icon: Icons.trip_origin, value: _from, onSet: (p) => _from = p),
-              const SizedBox(height: 8),
-              _PlaceField(app: app, label: 'Arrivée', icon: Icons.flag, value: _to, onSet: (p) => _to = p),
-            ]),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  children: [
+                    _PlaceField(
+                      app: app,
+                      label: 'Départ',
+                      icon: Icons.trip_origin,
+                      value: _from,
+                      onSet: (p) => _from = p,
+                    ),
+                    const SizedBox(height: 8),
+                    _PlaceField(app: app, label: 'Arrivée', icon: Icons.flag, value: _to, onSet: (p) => _to = p),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Inverser',
+                icon: const Icon(Icons.swap_vert),
+                onPressed: () => setState(() {
+                  final f = _from;
+                  _from = _to;
+                  _to = f;
+                  _fieldsKey = UniqueKey();
+                }),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Inverser',
-            icon: const Icon(Icons.swap_vert),
-            onPressed: () => setState(() {
-              final f = _from;
-              _from = _to;
-              _to = f;
-              _fieldsKey = UniqueKey();
-            }),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: SegmentedButton<int>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(value: 0, label: Text('Maintenant')),
+                    ButtonSegment(value: 1, label: Text('Partir à')),
+                    ButtonSegment(value: 2, label: Text('Arriver')),
+                  ],
+                  selected: {_when},
+                  onSelectionChanged: (s) async {
+                    final w = s.first;
+                    if (w != 0) {
+                      final t = await showTimePicker(context: context, initialTime: time);
+                      if (t == null) return;
+                      _time = t;
+                    }
+                    setState(() => _when = w);
+                  },
+                ),
+              ),
+              if (_when != 0) Padding(padding: const EdgeInsets.only(left: 8), child: Text(time.format(context))),
+            ],
           ),
-        ]),
-        const SizedBox(height: 8),
-        Row(children: [
-          Expanded(
-            child: SegmentedButton<int>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: 0, label: Text('Maintenant')),
-                ButtonSegment(value: 1, label: Text('Partir à')),
-                ButtonSegment(value: 2, label: Text('Arriver')),
-              ],
-              selected: {_when},
-              onSelectionChanged: (s) async {
-                final w = s.first;
-                if (w != 0) {
-                  final t = await showTimePicker(context: context, initialTime: time);
-                  if (t == null) return;
-                  _time = t;
-                }
-                setState(() => _when = w);
-              },
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _searching ? null : _run,
+              icon: _searching
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.search),
+              label: const Text('Rechercher'),
             ),
           ),
-          if (_when != 0) Padding(padding: const EdgeInsets.only(left: 8), child: Text(time.format(context))),
-        ]),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: _searching ? null : _run,
-            icon: _searching
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.search),
-            label: const Text('Rechercher'),
-          ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 
@@ -258,31 +274,46 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
-          child: Text('Itinéraires porte à porte, avec correspondances, calculés par Île-de-France Mobilités.\n'
-              'Nécessite internet et le jeton PRIM.', textAlign: TextAlign.center),
+          child: Text(
+            'Itinéraires porte à porte, avec correspondances, calculés par Île-de-France Mobilités.\n'
+            'Nécessite internet et le jeton PRIM.',
+            textAlign: TextAlign.center,
+          ),
         ),
       );
     }
     final now = app.nowSec();
     return ValueListenableBuilder(
       valueListenable: _realtime,
-      builder: (context, rt, _) => ListView(padding: const EdgeInsets.fromLTRB(8, 4, 8, 12), children: [
-        for (var i = 0; i < s.journeys.length; i++)
-          _JourneyCard(
-            search: s,
-            timed: _Timed(s.journeys[i], i, rt),
-            now: now,
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => _DetailScreen(app: app, search: s, index: i, realtime: _realtime))),
-          ),
-      ]),
+      builder: (context, rt, _) => ListView(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+        children: [
+          for (var i = 0; i < s.journeys.length; i++)
+            _JourneyCard(
+              search: s,
+              timed: _Timed(s.journeys[i], i, rt),
+              now: now,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => _DetailScreen(app: app, search: s, index: i, realtime: _realtime),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
 
 /// Champ de lieu : ma position, arrêts du catalogue (sur l'appareil), adresses (calculateur).
 class _PlaceField extends StatelessWidget {
-  const _PlaceField({required this.app, required this.label, required this.icon, required this.value, required this.onSet});
+  const _PlaceField({
+    required this.app,
+    required this.label,
+    required this.icon,
+    required this.value,
+    required this.onSet,
+  });
   final AppState app;
   final String label;
   final IconData icon;
@@ -302,8 +333,12 @@ class _PlaceField extends StatelessWidget {
     final local = <PlaceChoice>[
       if (q.isEmpty || 'ma position'.contains(q)) PlaceChoice.myPosition,
       for (final a in stops)
-        PlaceChoice(a.label, '${a.town.isEmpty ? 'Arrêt' : a.town} · ${a.lines.length} ligne(s)${_networks(a)}',
-            'stop_area:${a.id}', 'arret'),
+        PlaceChoice(
+          a.label,
+          '${a.town.isEmpty ? 'Arrêt' : a.town} · ${a.lines.length} ligne(s)${_networks(a)}',
+          'stop_area:${a.id}',
+          'arret',
+        ),
     ];
     // adresses demandées au calculateur seulement si c'est probablement une adresse (numéro de rue)
     // ou si peu d'arrêts correspondent : chaque recherche d'adresse coûte une requête
@@ -318,46 +353,50 @@ class _PlaceField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Autocomplete<PlaceChoice>(
-        initialValue: TextEditingValue(text: value?.label ?? ''),
-        displayStringForOption: (p) => p.label,
-        optionsBuilder: (v) => _options(v.text),
-        onSelected: onSet,
-        optionsViewBuilder: (context, onSelected, options) => Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 300, maxWidth: 360),
-              child: ListView(shrinkWrap: true, padding: EdgeInsets.zero, children: [
-                for (final p in options)
-                  ListTile(
-                    dense: true,
-                    leading: Icon(switch (p.kind) {
-                      'position' => Icons.my_location,
-                      'arret' => Icons.place_outlined,
-                      _ => Icons.home_outlined,
-                    }),
-                    title: Text(p.label),
-                    subtitle: Text(p.detail),
-                    onTap: () => onSelected(p),
-                  ),
-              ]),
-            ),
+    initialValue: TextEditingValue(text: value?.label ?? ''),
+    displayStringForOption: (p) => p.label,
+    optionsBuilder: (v) => _options(v.text),
+    onSelected: onSet,
+    optionsViewBuilder: (context, onSelected, options) => Align(
+      alignment: Alignment.topLeft,
+      child: Material(
+        elevation: 4,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 300, maxWidth: 360),
+          child: ListView(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            children: [
+              for (final p in options)
+                ListTile(
+                  dense: true,
+                  leading: Icon(switch (p.kind) {
+                    'position' => Icons.my_location,
+                    'arret' => Icons.place_outlined,
+                    _ => Icons.home_outlined,
+                  }),
+                  title: Text(p.label),
+                  subtitle: Text(p.detail),
+                  onTap: () => onSelected(p),
+                ),
+            ],
           ),
         ),
-        fieldViewBuilder: (context, ctrl, focus, onSubmit) => TextField(
-          controller: ctrl,
-          focusNode: focus,
-          onChanged: (_) => onSet(null), // texte modifié : il faut rechoisir une proposition
-          decoration: InputDecoration(
-            labelText: label,
-            hintText: 'Ma position, adresse ou arrêt',
-            prefixIcon: Icon(icon),
-            isDense: true,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-      );
+      ),
+    ),
+    fieldViewBuilder: (context, ctrl, focus, onSubmit) => TextField(
+      controller: ctrl,
+      focusNode: focus,
+      onChanged: (_) => onSet(null), // texte modifié : il faut rechoisir une proposition
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: 'Ma position, adresse ou arrêt',
+        prefixIcon: Icon(icon),
+        isDense: true,
+        border: const OutlineInputBorder(),
+      ),
+    ),
+  );
 }
 
 class _JourneyCard extends StatelessWidget {
@@ -383,21 +422,36 @@ class _JourneyCard extends StatelessWidget {
       if (steps.isNotEmpty) steps.add(Icon(Icons.chevron_right, size: 16, color: scheme.outline));
       if (s.isTransit) {
         final r = timed.realtime[k];
-        steps.add(Column(mainAxisSize: MainAxisSize.min, children: [
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(modeIcon(s.mode), size: 16),
-            const SizedBox(width: 2),
-            LineBadge(name: s.lineCode ?? '?', color: s.color, textColor: s.textColor, small: true),
-          ]),
-          if (r != null)
-            Text(r.cancelled ? 'supprimé' : delayLabel(r.delay),
-                style: TextStyle(fontSize: 10, color: _delayColor(context, r.cancelled ? 999 : r.delay))),
-        ]));
+        steps.add(
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(modeIcon(s.mode), size: 16),
+                  const SizedBox(width: 2),
+                  LineBadge(name: s.lineCode ?? '?', color: s.color, textColor: s.textColor, small: true),
+                ],
+              ),
+              if (r != null)
+                Text(
+                  r.cancelled ? 'supprimé' : delayLabel(r.delay),
+                  style: TextStyle(fontSize: 10, color: _delayColor(context, r.cancelled ? 999 : r.delay)),
+                ),
+            ],
+          ),
+        );
       } else {
-        steps.add(Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.directions_walk, size: 16),
-          Text('${(s.duration / 60).ceil()}', style: const TextStyle(fontSize: 12)),
-        ]));
+        steps.add(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.directions_walk, size: 16),
+              Text('${(s.duration / 60).ceil()}', style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+        );
       }
     }
     final broken = timed.brokenAt;
@@ -407,36 +461,52 @@ class _JourneyCard extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(10),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Text('${hhmm(timed.start)} → ${hhmm(timed.end)}', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text('${duration(timed.end - timed.start)} · '
-                    '${j.transit.isEmpty ? 'à pied' : j.transfers == 0 ? 'direct' : '${j.transfers} corresp.'}'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text('${hhmm(timed.start)} → ${hhmm(timed.end)}', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      '${duration(timed.end - timed.start)} · '
+                      '${j.transit.isEmpty
+                          ? 'à pied'
+                          : j.transfers == 0
+                          ? 'direct'
+                          : '${j.transfers} corresp.'}',
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    timed.start <= now ? 'en cours' : 'dans ${duration(timed.start - now)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
-              const Spacer(),
-              Text(timed.start <= now ? 'en cours' : 'dans ${duration(timed.start - now)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-            ]),
-            const SizedBox(height: 6),
-            Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 2, runSpacing: 4, children: steps),
-            if (broken != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
+              const SizedBox(height: 6),
+              Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 2, runSpacing: 4, children: steps),
+              if (broken != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
                     timed.realtime[broken]?.cancelled == true
                         ? '⚠ ${j.sections[broken].lineCode} supprimé : relancez la recherche'
                         : '⚠ Correspondance compromise à ${j.sections[broken].from?.name} : relancez la recherche',
-                    style: TextStyle(color: scheme.error, fontWeight: FontWeight.bold)),
-              ),
-            if (disruptions > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text('ⓘ $disruptions perturbation(s) sur le parcours',
-                    style: TextStyle(fontSize: 12, color: scheme.tertiary)),
-              ),
-          ]),
+                    style: TextStyle(color: scheme.error, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              if (disruptions > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    'ⓘ $disruptions perturbation(s) sur le parcours',
+                    style: TextStyle(fontSize: 12, color: scheme.tertiary),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -461,35 +531,42 @@ class _DetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ValueListenableBuilder(
-        valueListenable: realtime,
-        builder: (context, rt, _) {
-          final t = _Timed(search.journeys[index], index, rt);
-          final j = t.journey;
-          return Scaffold(
-            appBar: AppBar(title: Text('${hhmm(t.start)} → ${hhmm(t.end)} · ${duration(t.end - t.start)}')),
-            body: Column(children: [
-              Expanded(flex: 4, child: _map(context, j)),
-              Expanded(
-                flex: 5,
-                child: ListView(padding: const EdgeInsets.all(12), children: [
+    valueListenable: realtime,
+    builder: (context, rt, _) {
+      final t = _Timed(search.journeys[index], index, rt);
+      final j = t.journey;
+      return Scaffold(
+        appBar: AppBar(title: Text('${hhmm(t.start)} → ${hhmm(t.end)} · ${duration(t.end - t.start)}')),
+        body: Column(
+          children: [
+            Expanded(flex: 4, child: _map(context, j)),
+            Expanded(
+              flex: 5,
+              child: ListView(
+                padding: const EdgeInsets.all(12),
+                children: [
                   if (t.brokenAt != null)
                     Card(
                       color: Theme.of(context).colorScheme.errorContainer,
                       child: ListTile(
                         leading: const Icon(Icons.warning_amber),
-                        title: Text(t.realtime[t.brokenAt!]?.cancelled == true
-                            ? '${j.sections[t.brokenAt!].lineCode} supprimé'
-                            : 'Correspondance compromise à ${j.sections[t.brokenAt!].from?.name}'),
+                        title: Text(
+                          t.realtime[t.brokenAt!]?.cancelled == true
+                              ? '${j.sections[t.brokenAt!].lineCode} supprimé'
+                              : 'Correspondance compromise à ${j.sections[t.brokenAt!].from?.name}',
+                        ),
                         subtitle: const Text('Relancez la recherche pour un autre itinéraire.'),
                       ),
                     ),
                   for (var k = 0; k < j.sections.length; k++) _step(context, t, k),
-                ]),
+                ],
               ),
-            ]),
-          );
-        },
+            ),
+          ],
+        ),
       );
+    },
+  );
 
   Widget _map(BuildContext context, Journey j) {
     final all = [for (final s in j.sections) ...s.shape];
@@ -509,33 +586,60 @@ class _DetailScreen extends StatelessWidget {
           userAgentPackageName: 'fr.applitransport.app',
           tileBuilder: dark ? darkModeTileBuilder : null,
         ),
-        PolylineLayer(polylines: [
-          for (final s in j.sections)
-            if (s.shape.length >= 2)
-              s.isTransit
-                  ? Polyline(points: s.shape, color: s.color, strokeWidth: 5)
-                  // marche : pointillés bleus cerclés de blanc, lisibles sur le fond de carte
-                  : Polyline(
-                      points: s.shape,
-                      color: Colors.blue.shade700,
-                      strokeWidth: 5,
-                      borderColor: Colors.white,
-                      borderStrokeWidth: 1.5,
-                      pattern: const StrokePattern.dotted(spacingFactor: 1.6)),
-        ]),
-        CircleLayer(circles: [
-          for (final s in j.transit) ...[
-            if (s.from != null)
-              CircleMarker(point: s.from!.pos, radius: 6, color: Colors.white, borderColor: s.color, borderStrokeWidth: 3),
-            if (s.to != null)
-              CircleMarker(point: s.to!.pos, radius: 6, color: Colors.white, borderColor: s.color, borderStrokeWidth: 3),
+        PolylineLayer(
+          polylines: [
+            for (final s in j.sections)
+              if (s.shape.length >= 2)
+                s.isTransit
+                    ? Polyline(points: s.shape, color: s.color, strokeWidth: 5)
+                    // marche : pointillés bleus cerclés de blanc, lisibles sur le fond de carte
+                    : Polyline(
+                        points: s.shape,
+                        color: Colors.blue.shade700,
+                        strokeWidth: 5,
+                        borderColor: Colors.white,
+                        borderStrokeWidth: 1.5,
+                        pattern: const StrokePattern.dotted(spacingFactor: 1.6),
+                      ),
           ],
-        ]),
-        MarkerLayer(markers: [
-          if (first != null) Marker(point: first.pos, child: const Icon(Icons.trip_origin, color: Colors.green, size: 22)),
-          if (last != null)
-            Marker(point: last.pos, alignment: Alignment.topCenter, child: const Icon(Icons.flag, color: Colors.red, size: 28)),
-        ]),
+        ),
+        CircleLayer(
+          circles: [
+            for (final s in j.transit) ...[
+              if (s.from != null)
+                CircleMarker(
+                  point: s.from!.pos,
+                  radius: 6,
+                  color: Colors.white,
+                  borderColor: s.color,
+                  borderStrokeWidth: 3,
+                ),
+              if (s.to != null)
+                CircleMarker(
+                  point: s.to!.pos,
+                  radius: 6,
+                  color: Colors.white,
+                  borderColor: s.color,
+                  borderStrokeWidth: 3,
+                ),
+            ],
+          ],
+        ),
+        MarkerLayer(
+          markers: [
+            if (first != null)
+              Marker(
+                point: first.pos,
+                child: const Icon(Icons.trip_origin, color: Colors.green, size: 22),
+              ),
+            if (last != null)
+              Marker(
+                point: last.pos,
+                alignment: Alignment.topCenter,
+                child: const Icon(Icons.flag, color: Colors.red, size: 28),
+              ),
+          ],
+        ),
         const RichAttributionWidget(attributions: [TextSourceAttribution('OpenStreetMap contributors')]),
       ],
     );
@@ -546,7 +650,11 @@ class _DetailScreen extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     switch (s.type) {
       case 'wait':
-        return ListTile(dense: true, leading: const Icon(Icons.hourglass_empty), title: Text('Attente ${duration(s.duration)}'));
+        return ListTile(
+          dense: true,
+          leading: const Icon(Icons.hourglass_empty),
+          title: Text('Attente ${duration(s.duration)}'),
+        );
       case 'walk':
       case 'transfer':
         return ListTile(
@@ -560,61 +668,81 @@ class _DetailScreen extends StatelessWidget {
     final lineId = s.lineId != null && app.line(s.lineId!) != null ? s.lineId : null;
     final texts = {
       for (final id in s.disruptions)
-        if (search.disruptions[id] != null) search.disruptions[id]!.title
+        if (search.disruptions[id] != null) search.disruptions[id]!.title,
     }.where((x) => x.isNotEmpty).toList();
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(10),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Icon(modeIcon(s.mode)),
-            const SizedBox(width: 6),
-            LineBadge(name: s.lineCode ?? '?', color: s.color, textColor: s.textColor),
-            const SizedBox(width: 6),
-            Expanded(child: Text('${s.mode} → ${s.direction}', overflow: TextOverflow.ellipsis)),
-            if (r != null)
-              Text(r.cancelled ? 'supprimé' : delayLabel(r.delay),
-                  style: TextStyle(color: _delayColor(context, r.cancelled ? 999 : r.delay), fontWeight: FontWeight.bold)),
-          ]),
-          const SizedBox(height: 6),
-          Text('Montée ${hhmm(t.dep[k])} · ${s.from?.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text('Descente ${hhmm(t.arr[k])} · ${s.to?.name}'),
-          Text('${s.stops.length - 1} arrêt(s) · ${duration(s.duration)}', style: TextStyle(color: scheme.outline)),
-          if (texts.isNotEmpty)
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              dense: true,
-              leading: Icon(Icons.info_outline, color: scheme.tertiary),
-              title: Text('${texts.length} perturbation(s)', style: TextStyle(color: scheme.tertiary)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                for (final x in texts)
-                  Padding(padding: const EdgeInsets.only(bottom: 6), child: Text('• $x', style: const TextStyle(fontSize: 12))),
+                Icon(modeIcon(s.mode)),
+                const SizedBox(width: 6),
+                LineBadge(name: s.lineCode ?? '?', color: s.color, textColor: s.textColor),
+                const SizedBox(width: 6),
+                Expanded(child: Text('${s.mode} → ${s.direction}', overflow: TextOverflow.ellipsis)),
+                if (r != null)
+                  Text(
+                    r.cancelled ? 'supprimé' : delayLabel(r.delay),
+                    style: TextStyle(
+                      color: _delayColor(context, r.cancelled ? 999 : r.delay),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
               ],
             ),
-          if (lineId != null)
-            Align(
-              alignment: Alignment.centerRight,
-              child: ListenableBuilder(
-                listenable: app,
-                builder: (context, _) => app.downloading.containsKey(lineId)
-                    ? const Padding(
-                        padding: EdgeInsets.all(8),
-                        child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
-                    : TextButton.icon(
-                        icon: Icon(app.hasSchedules(lineId) ? Icons.timeline : Icons.download),
-                        label: Text('${app.hasSchedules(lineId) ? '' : 'Télécharger et '}suivre ce '
-                            '${(s.mode ?? '').toLowerCase().contains('bus') ? 'bus' : 'train'}'),
-                        onPressed: () async {
-                          // ligne absente de l'appareil : on la télécharge d'abord (quelques Ko)
-                          if (!app.hasSchedules(lineId)) await app.download(lineId);
-                          if (!context.mounted || !app.hasSchedules(lineId)) return;
-                          Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) => LineScreen(app: app, lineId: lineId, fromArea: s.from?.area, toArea: s.to?.area)));
-                        },
-                      ),
+            const SizedBox(height: 6),
+            Text('Montée ${hhmm(t.dep[k])} · ${s.from?.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Descente ${hhmm(t.arr[k])} · ${s.to?.name}'),
+            Text('${s.stops.length - 1} arrêt(s) · ${duration(s.duration)}', style: TextStyle(color: scheme.outline)),
+            if (texts.isNotEmpty)
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                dense: true,
+                leading: Icon(Icons.info_outline, color: scheme.tertiary),
+                title: Text('${texts.length} perturbation(s)', style: TextStyle(color: scheme.tertiary)),
+                children: [
+                  for (final x in texts)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text('• $x', style: const TextStyle(fontSize: 12)),
+                    ),
+                ],
               ),
-            ),
-        ]),
+            if (lineId != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: ListenableBuilder(
+                  listenable: app,
+                  builder: (context, _) => app.downloading.containsKey(lineId)
+                      ? const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                        )
+                      : TextButton.icon(
+                          icon: Icon(app.hasSchedules(lineId) ? Icons.timeline : Icons.download),
+                          label: Text(
+                            '${app.hasSchedules(lineId) ? '' : 'Télécharger et '}suivre ce '
+                            '${(s.mode ?? '').toLowerCase().contains('bus') ? 'bus' : 'train'}',
+                          ),
+                          onPressed: () async {
+                            // ligne absente de l'appareil : on la télécharge d'abord (quelques Ko)
+                            if (!app.hasSchedules(lineId)) await app.download(lineId);
+                            if (!context.mounted || !app.hasSchedules(lineId)) return;
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    LineScreen(app: app, lineId: lineId, fromArea: s.from?.area, toArea: s.to?.area),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

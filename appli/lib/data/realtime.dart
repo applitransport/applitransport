@@ -3,6 +3,7 @@
 // Rattachement : par numéro de course quand il figure dans l'identifiant GTFS (bus), sinon par
 // arrêt + heure prévue (trains SNCF, dont les identifiants ne correspondent pas aux horaires).
 import '../poc/data.dart';
+import 'paris_time.dart';
 
 // Course terminée restée dans la réponse (« fantôme ») : tous ses arrêts restants sont passés depuis
 // plus de [_finishedAfter]. L'ancienneté de RecordedAtTime ne prouve rien : la SNCF ne met à jour une
@@ -38,7 +39,12 @@ String? gtfsStopId(String ref) {
   return null; // identifiant propre à l'exploitant (ex. terminus Gare de Trappes)
 }
 
-DateTime? _time(dynamic v) => v == null ? null : DateTime.tryParse(v as String)?.toLocal();
+/// Heure SIRI (UTC) → heure de Paris, quel que soit le fuseau de l'appareil.
+DateTime? _time(dynamic v) {
+  final t = v == null ? null : DateTime.tryParse(v as String);
+  return t == null ? null : parisTime(t);
+}
+
 String _value(dynamic v) => v is Map ? (v['value'] ?? '') as String : (v ?? '') as String;
 
 RtCall _call(Map<String, dynamic> c, [String? stopRef]) => RtCall(
@@ -123,7 +129,7 @@ class StepRealtime {
 /// Passage d'une ligne à un arrêt, prévu à [aimedSec] (s depuis minuit de [day]), dans une réponse
 /// « arrêt » : rattaché par ligne et heure prévue (à 90 s près).
 StepRealtime? findStep(List<RtJourney> journeys, String lineCode, int aimedSec, DateTime day) {
-  final midnight = DateTime(day.year, day.month, day.day);
+  final midnight = parisMidnight(day);
   for (final j in journeys) {
     if (!j.lineRef.contains(lineCode)) continue;
     for (final c in j.calls) {
@@ -148,7 +154,7 @@ Map<String, TripRealtime> matchToTimetable(
   DateTime now, {
   required bool remaining,
 }) {
-  final midnight = DateTime(day.year, day.month, day.day);
+  final midnight = parisMidnight(day);
   int secOf(DateTime t) => t.difference(midnight).inSeconds;
   final code = line.id;
 

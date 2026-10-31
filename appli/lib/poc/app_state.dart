@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/package_decoder.dart';
+import '../data/paris_time.dart';
 import '../data/prim.dart';
 import '../data/realtime.dart';
 import '../data/repository.dart';
@@ -58,7 +59,7 @@ class AppState extends ChangeNotifier {
   bool isExpired(String id) {
     final until = repo.local[id]?.until;
     final n = now();
-    return until != null && until.isBefore(DateTime(n.year, n.month, n.day));
+    return until != null && parisMidnight(until).isBefore(parisMidnight(n));
   }
 
   Future<void> _guard(Future<void> Function() action) async {
@@ -176,7 +177,7 @@ class AppState extends ChangeNotifier {
     final local = repo.local[id];
     if (local == null) return null;
     final n = now();
-    final day = DateTime(n.year, n.month, n.day);
+    final day = parisMidnight(n);
     final cached = _timetables[id];
     if (cached != null && cached.$1 == local.version && cached.$2 == day) return cached.$3;
     final t = timetableFor(repo.readLineSync(id), day);
@@ -231,7 +232,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  DateTime now() => DateTime.now();
+  /// Heure de Paris, indépendante du fuseau de l'appareil (voir data/paris_time.dart).
+  DateTime now() => parisNow();
 
   int nowSec() {
     final n = now();
@@ -267,7 +269,8 @@ class AppState extends ChangeNotifier {
         return (ok: false, message: 'Serveur joignable mais catalogue absent (HTTP ${r.statusCode})');
       }
       final c = readPackage(r.bodyBytes);
-      final at = DateTime.tryParse(c['generated_at'] ?? '')?.toLocal();
+      final generated = DateTime.tryParse(c['generated_at'] ?? '');
+      final at = generated == null ? null : parisTime(generated);
       return (
         ok: true,
         message:
@@ -324,7 +327,7 @@ class AppState extends ChangeNotifier {
 
   DateTime _serviceDay() {
     final n = now();
-    return DateTime(n.year, n.month, n.day);
+    return parisMidnight(n);
   }
 
   // --- Info Trafic (perturbations), gardée 15 min par ligne ----------------------------
@@ -373,7 +376,7 @@ class AppState extends ChangeNotifier {
     if (data['error'] != null) {
       throw PrimException((data['error']['message'] ?? data['error']['id'] ?? 'erreur du calculateur').toString());
     }
-    return ItinerarySearch.fromNavitia(data, DateTime(when.year, when.month, when.day));
+    return ItinerarySearch.fromNavitia(data, parisMidnight(when));
   }
 
   /// Temps réel des étapes : une requête « arrêt » par zone de montée, chaque étape y est retrouvée
