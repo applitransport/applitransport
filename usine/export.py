@@ -266,7 +266,10 @@ def export(db_file=DB_FILE, out_dir=PUBLIC_DIR, feed_info=None):
     catalog = {"format": FORMAT, "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                "license": {"name": "ODbL 1.0", "url": "https://opendatacommons.org/licenses/odbl/1-0/",
                            "attribution": "Île-de-France Mobilités"},
-               "feed": feed_info or {}, "networks": networks, "lines": catalog_lines,
+               "feed": feed_info or {},
+               # bilan de la publication, lisible sans les journaux de GitHub Actions
+               "publication": {"kept": kept, "republished": len(catalog_lines) - kept},
+               "networks": networks, "lines": catalog_lines,
                "stop_areas": sorted(areas, key=lambda a: a["name"])}
     # paquets de lignes disparues du GTFS : retirés de la publication
     for old in set(lines_dir.glob("*.json.gz")) - {out_dir / l["file"] for l in catalog_lines}:

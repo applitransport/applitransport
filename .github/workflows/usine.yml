@@ -5,7 +5,9 @@ name: Usine à données
 
 on:
   schedule:
-    - cron: "30 7 * * *" # 07:30 UTC, après la publication quotidienne d'IDFM (vers 06:25 UTC)
+    # 06:53 UTC, après la publication quotidienne d'IDFM (vers 06:25 UTC). Minute « impaire » : GitHub
+    # retarde beaucoup les tâches planifiées à l'heure pile ou à la demie (jusqu'à 7 h constatées).
+    - cron: "53 6 * * *"
   workflow_dispatch: # lancement manuel depuis l'onglet Actions
   push: # code de l'usine modifié : on republie sans attendre le lendemain
     branches: [main]
@@ -24,17 +26,17 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install -r usine/requirements.txt
       # publication de la veille : une ligne dont les horaires n'ont pas changé garde son paquet et
       # sa version, et les applis ne la retéléchargent pas
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         with:
           path: usine/out/public
           key: publication-${{ github.run_id }}
@@ -45,20 +47,27 @@ jobs:
       - run: python usine/update.py --force
       - name: Contrôle de deux paquets
         run: python usine/check_package.py C01527 C01528
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@v6
         with:
           path: usine/out/public
           key: publication-${{ github.run_id }}
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: usine/out/public
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.retry.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+      # GitHub Pages renvoie parfois une erreur 500 passagère (30/10/2026) : nouvel essai une minute après
+      - if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+      - id: retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v5
