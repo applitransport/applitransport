@@ -4,7 +4,10 @@
 // arrêt + heure prévue (trains SNCF, dont les identifiants ne correspondent pas aux horaires).
 import '../poc/data.dart';
 
-const _staleAfter = Duration(minutes: 15); // course sans nouvelles : donnée périmée (bus fantôme)
+// Course terminée restée dans la réponse (« fantôme ») : tous ses arrêts restants sont passés depuis
+// plus de [_finishedAfter]. L'ancienneté de RecordedAtTime ne prouve rien : la SNCF ne met à jour une
+// course que si elle change (train en route vu sans mise à jour depuis 2 h, surveillance du 29/10/2026).
+const _finishedAfter = Duration(minutes: 3);
 
 class RtCall {
   RtCall(this.stopId, this.aimed, this.expected, this.status);
@@ -39,39 +42,43 @@ DateTime? _time(dynamic v) => v == null ? null : DateTime.tryParse(v as String)?
 String _value(dynamic v) => v is Map ? (v['value'] ?? '') as String : (v ?? '') as String;
 
 RtCall _call(Map<String, dynamic> c, [String? stopRef]) => RtCall(
-      gtfsStopId(stopRef ?? _value(c['StopPointRef'])),
-      _time(c['AimedDepartureTime'] ?? c['AimedArrivalTime']),
-      _time(c['ExpectedDepartureTime'] ?? c['ExpectedArrivalTime']),
-      ((c['DepartureStatus'] ?? c['ArrivalStatus'] ?? '') as String).toUpperCase(),
-    );
+  gtfsStopId(stopRef ?? _value(c['StopPointRef'])),
+  _time(c['AimedDepartureTime'] ?? c['AimedArrivalTime']),
+  _time(c['ExpectedDepartureTime'] ?? c['ExpectedArrivalTime']),
+  ((c['DepartureStatus'] ?? c['ArrivalStatus'] ?? '') as String).toUpperCase(),
+);
 
 /// Requête « ligne » : courses en circulation, avec leurs arrêts restants (non triés).
 List<RtJourney> parseEstimatedTimetable(Map<String, dynamic> data) => [
-      for (final d in (data['Siri']?['ServiceDelivery']?['EstimatedTimetableDelivery'] ?? const []) as List)
-        for (final f in (d['EstimatedJourneyVersionFrame'] ?? const []) as List)
-          for (final j in (f['EstimatedVehicleJourney'] ?? const []) as List)
-            RtJourney(
-              _value(j['DatedVehicleJourneyRef']),
-              _value(j['LineRef']),
-              _time(j['RecordedAtTime']),
-              j['Cancellation'] == true,
-              [for (final c in (j['EstimatedCalls']?['EstimatedCall'] ?? const []) as List) _call(c)],
-            ),
-    ];
+  for (final d in (data['Siri']?['ServiceDelivery']?['EstimatedTimetableDelivery'] ?? const []) as List)
+    for (final f in (d['EstimatedJourneyVersionFrame'] ?? const []) as List)
+      for (final j in (f['EstimatedVehicleJourney'] ?? const []) as List)
+        RtJourney(
+          _value(j['DatedVehicleJourneyRef']),
+          _value(j['LineRef']),
+          _time(j['RecordedAtTime']),
+          j['Cancellation'] == true,
+          [for (final c in (j['EstimatedCalls']?['EstimatedCall'] ?? const []) as List) _call(c)],
+        ),
+];
 
 /// Requête « arrêt » : un passage par course, à l'arrêt interrogé.
 List<RtJourney> parseStopMonitoring(Map<String, dynamic> data) => [
-      for (final d in (data['Siri']?['ServiceDelivery']?['StopMonitoringDelivery'] ?? const []) as List)
-        for (final v in (d['MonitoredStopVisit'] ?? const []) as List)
-          RtJourney(
-            _value(v['MonitoredVehicleJourney']?['FramedVehicleJourneyRef']?['DatedVehicleJourneyRef']),
-            _value(v['MonitoredVehicleJourney']?['LineRef']),
-            _time(v['RecordedAtTime']),
-            v['MonitoredVehicleJourney']?['Cancellation'] == true,
-            [_call((v['MonitoredVehicleJourney']?['MonitoredCall'] ?? const {}) as Map<String, dynamic>,
-                _value(v['MonitoringRef']))],
+  for (final d in (data['Siri']?['ServiceDelivery']?['StopMonitoringDelivery'] ?? const []) as List)
+    for (final v in (d['MonitoredStopVisit'] ?? const []) as List)
+      RtJourney(
+        _value(v['MonitoredVehicleJourney']?['FramedVehicleJourneyRef']?['DatedVehicleJourneyRef']),
+        _value(v['MonitoredVehicleJourney']?['LineRef']),
+        _time(v['RecordedAtTime']),
+        v['MonitoredVehicleJourney']?['Cancellation'] == true,
+        [
+          _call(
+            (v['MonitoredVehicleJourney']?['MonitoredCall'] ?? const {}) as Map<String, dynamic>,
+            _value(v['MonitoringRef']),
           ),
-    ];
+        ],
+      ),
+];
 
 /// Temps réel d'une course : retard connu à certains arrêts, prochain arrêt, suppressions.
 class TripRealtime {
@@ -134,11 +141,15 @@ String tripKey(int direction, int variant, int trip) => '$direction/$variant/$tr
 
 /// Rattache les courses temps réel aux horaires d'une ligne pour le jour de service [day].
 /// [remaining] : la réponse ne liste que les arrêts restants (requête « ligne »).
-Map<String, TripRealtime> matchToTimetable(DemoLine line, List<RtJourney> journeys, DateTime day, DateTime now,
-    {required bool remaining}) {
+Map<String, TripRealtime> matchToTimetable(
+  DemoLine line,
+  List<RtJourney> journeys,
+  DateTime day,
+  DateTime now, {
+  required bool remaining,
+}) {
   final midnight = DateTime(day.year, day.month, day.day);
   int secOf(DateTime t) => t.difference(midnight).inSeconds;
-  final nowSec = secOf(now);
   final code = line.id;
 
   // index : numéro de course → clé ; quai → [(heure, clé)]
@@ -176,8 +187,8 @@ Map<String, TripRealtime> matchToTimetable(DemoLine line, List<RtJourney> journe
     if (key == null) continue;
     final (dir, v, t) = key;
     final variant = line.directions.firstWhere((d) => d.id == dir).variants[v];
-    // course censée rouler mais sans nouvelles depuis longtemps : on l'ignore
-    if (remaining && j.recordedAt != null && variant.trips[t].first < nowSec && now.difference(j.recordedAt!) > _staleAfter) {
+    // course terminée restée dans la réponse : on l'ignore
+    if (remaining && j.calls.every((c) => c.expected == null || now.difference(c.expected!) > _finishedAfter)) {
       continue;
     }
     final known = <int, int>{};

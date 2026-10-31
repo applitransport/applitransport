@@ -47,6 +47,30 @@ void main() {
     expect(rt.length, greaterThanOrEqualTo(20));
   });
 
+  // Relevés réels de la surveillance (29/10/2026), heures de Paris.
+  final trainN = timetableFor(readPackage(File('test/fixtures/C01736.json.gz').readAsBytesSync()), day);
+
+  test('train N supprimé (17 h 34) : statut CANCELLED à chaque arrêt, sans indicateur Cancellation', () {
+    final data = json('prim_et_N_1734_train_supprime.json');
+    final now = DateTime.parse(data['Siri']['ServiceDelivery']['ResponseTimestamp']).toLocal();
+    final journeys = parseEstimatedTimetable(data);
+    expect(journeys.any((j) => j.cancelled), isFalse); // la SNCF ne remplit pas l'indicateur de course
+    final rt = matchToTimetable(trainN, journeys, day, now, remaining: true);
+    final cancelled = rt.values.where((r) => r.cancelled).toList();
+    expect(cancelled.length, 1); // le Paris Montparnasse → Plaisir - Grignon de 17 h 34
+    expect(cancelled.single.cancelledStops.length, cancelled.single.stopCount - cancelled.single.nextIndex!);
+  });
+
+  test('train N non mis à jour depuis longtemps mais en route : gardé ; trains arrivés : écartés', () {
+    final data = json('prim_et_N_1855_maj_ancienne.json');
+    final now = DateTime.parse(data['Siri']['ServiceDelivery']['ResponseTimestamp']).toLocal();
+    final journeys = parseEstimatedTimetable(data);
+    // la SNCF ne met à jour une course que si elle change : l'ancienneté ne prouve pas un fantôme
+    final live = journeys.where((j) => j.calls.any((c) => c.expected != null && c.expected!.isAfter(now))).length;
+    final rt = matchToTimetable(trainN, journeys, day, now, remaining: true);
+    expect(rt.length, live);
+  });
+
   test('retards : remplissage entre arrêts connus', () {
     final r = TripRealtime({2: 60, 5: 180}, 7, nextIndex: 2);
     expect(r.delays, [60, 60, 60, 180, 180, 180, 180]);
