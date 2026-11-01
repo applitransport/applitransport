@@ -66,6 +66,11 @@ DateTime? lastServiceDay(Map<String, dynamic> pkg) {
   return last == null ? null : DateTime.parse(last);
 }
 
+/// Destination affichée. Les trains SNCF ont pour destination un code de mission (« DEFI », « VERI ») :
+/// on affiche alors le terminus, suivi du code, qui est aussi celui des écrans en gare.
+String destinationLabel(String headsign, String terminus) =>
+    RegExp(r'^[A-Z]{4}$').hasMatch(headsign) ? '$terminus ($headsign)' : headsign;
+
 /// Heures de départ d'une course à chaque arrêt (s depuis minuit de son jour de service).
 List<int> _departures(List<dynamic> t) {
   final deps = <int>[t[3] as int];
@@ -114,7 +119,7 @@ DemoLine timetableFor(Map<String, dynamic> pkg, DateTime day, {bool withPrevious
       final shapeId = pattern['shape_id'] as String?;
       variants.add(
         Variant(
-          pattern['headsign'] ?? '',
+          destinationLabel(pattern['headsign'] ?? '', stops[(pattern['stops'] as List).last][0] as String),
           [
             for (final id in pattern['stops'])
               Stop(

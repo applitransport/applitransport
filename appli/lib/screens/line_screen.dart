@@ -46,21 +46,14 @@ class _LineScreenState extends State<LineScreen> {
   bool get _usable => line != null && line!.directions.isNotEmpty;
   Direction get direction => line!.directions[_dir];
 
-  /// Arrêts où l'on peut monter (tous sauf les terminus d'arrivée).
-  List<Stop> get _boardingStops => [
-    for (final s in direction.stops)
-      if (direction.variants.any((v) {
-        final i = v.indexOf(s.name);
-        return i >= 0 && i < v.stops.length - 1;
-      }))
-        s,
-  ];
+  /// Arrêts du sens choisi, terminus d'arrivée compris (pour suivre un train jusqu'à son arrivée).
+  List<Stop> get _stops => direction.stops;
 
   @override
   void initState() {
     super.initState();
     _lineId = app.preferred.where(app.hasSchedules).firstOrNull;
-    if (_usable) _stop = _boardingStops.first.name;
+    if (_usable) _stop = _stops.first.name;
     if (widget.lineId != null && app.hasSchedules(widget.lineId!)) _openAt(widget.lineId!);
     if (_lineId != null) app.loadTraffic(_lineId!);
     _scrollToNextSoon();
@@ -87,7 +80,7 @@ class _LineScreenState extends State<LineScreen> {
         }
       }
     }
-    _stop = _boardingStops.first.name;
+    _stop = _stops.first.name;
   }
 
   void _scrollToNextSoon() => WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -102,7 +95,7 @@ class _LineScreenState extends State<LineScreen> {
       app.loadTraffic(lineId);
     }
     if (dir != null) _dir = dir;
-    if ((lineId != null || dir != null) && _usable) _stop = _boardingStops.first.name;
+    if ((lineId != null || dir != null) && _usable) _stop = _stops.first.name;
     if (stop != null) _stop = stop;
     _selected = null;
     _scrollToNextSoon();
@@ -113,7 +106,7 @@ class _LineScreenState extends State<LineScreen> {
     final d = direction;
     for (var v = 0; v < d.variants.length; v++) {
       final i = d.variants[v].indexOf(_stop!);
-      if (i < 0 || i >= d.variants[v].stops.length - 1) continue;
+      if (i < 0) continue;
       for (var t = 0; t < d.variants[v].trips.length; t++) {
         // course de la veille passée à cet arrêt avant minuit : pas dans la liste du jour
         if (d.variants[v].trips[t][i] < 0) continue;
@@ -278,7 +271,7 @@ class _LineScreenState extends State<LineScreen> {
                     value: _stop,
                     isExpanded: true,
                     items: [
-                      for (final s in _boardingStops)
+                      for (final s in _stops)
                         DropdownMenuItem(
                           value: s.name,
                           child: Text(s.name, overflow: TextOverflow.ellipsis),
@@ -314,6 +307,8 @@ class _LineScreenState extends State<LineScreen> {
       final selected = p.id == _selected;
       final late = (delay ?? 0) >= 90;
       final headsign = d.variants[p.variant].headsign;
+      // terminus de cette course : on y arrive, on n'en repart pas
+      final terminus = p.index == d.variants[p.variant].stops.length - 1;
       final fg = selected ? l.textColor : null;
       chips.add(
         InkWell(
@@ -360,8 +355,10 @@ class _LineScreenState extends State<LineScreen> {
                             : okColor),
                   ),
                 ),
+                if (terminus)
+                  Text('arrivée', style: TextStyle(fontSize: 9, color: fg ?? scheme.secondary))
                 // destination affichée seulement quand elle diffère du sens principal
-                if (headsign != d.label)
+                else if (headsign != d.label)
                   Text(
                     '→ $headsign',
                     maxLines: 1,

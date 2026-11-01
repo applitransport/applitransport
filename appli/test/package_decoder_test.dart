@@ -57,6 +57,12 @@ void main() {
     );
   });
 
+  test('destination des trains : terminus et code de mission plutôt que le code seul', () {
+    expect(destinationLabel('DEFI', 'La Défense'), 'La Défense (DEFI)');
+    expect(destinationLabel('Pas du Lac', 'Pas du Lac'), 'Pas du Lac'); // bus : inchangé
+    expect(destinationLabel('Saint-Exupéry', 'Montigny Saint-Exupéry'), 'Saint-Exupéry');
+  });
+
   test('polyligne : décodage de l\'exemple Google', () {
     final pts = decodePolyline('_p~iF~ps|U_ulLnnqC_mqNvxq`@');
     expect(pts.length, 3);
