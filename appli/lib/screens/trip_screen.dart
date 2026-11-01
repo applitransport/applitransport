@@ -345,7 +345,7 @@ class _TripScreenState extends State<TripScreen> {
     } else if (nothingDownloaded) {
       message = 'Aucune ligne téléchargée ne fait ce trajet.\nAjoutez celles proposées ci-dessus.';
     } else if (journeys.isEmpty) {
-      message = 'Aucun bus direct dans les 2 prochaines heures.';
+      message = 'Aucun départ direct dans les 2 prochaines heures.';
     }
     if (message != null) {
       return Center(
@@ -420,8 +420,8 @@ class _TripScreenState extends State<TripScreen> {
           final s = busStatus(j.variant, j.trip, now, r);
           final text = r == null
               ? (app.refreshedAt.containsKey(j.line.id)
-                    ? 'PRIM ne donne pas d\'information sur ce bus : horaire théorique.'
-                    : 'Appuyez sur Actualiser pour savoir où est ce bus.')
+                    ? 'PRIM ne donne pas d\'information sur ce ${vehicleWord(j.line.type)} : horaire théorique.'
+                    : 'Appuyez sur Actualiser pour savoir où est ce ${vehicleWord(j.line.type)}.')
               : r.cancelled
               ? 'Course supprimée.'
               : s == null
@@ -439,6 +439,7 @@ class _TripScreenState extends State<TripScreen> {
                 ),
                 Expanded(
                   child: LineMap(
+                    vehicleIcon: vehicleIcon(j.line.type),
                     shapes: [j.variant.shape],
                     stops: j.variant.stops,
                     color: j.line.color,

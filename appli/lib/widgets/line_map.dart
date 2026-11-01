@@ -25,6 +25,7 @@ class LineMap extends StatefulWidget {
     this.myStop,
     this.buses = const [],
     this.onBusTap,
+    this.vehicleIcon = Icons.directions_bus,
   });
 
   final List<List<LatLng>> shapes;
@@ -33,6 +34,9 @@ class LineMap extends StatefulWidget {
   final Stop? myStop;
   final List<MapBus> buses;
   final void Function(String busId)? onBusTap;
+
+  /// Icône des véhicules sur la carte (bus, train, métro, tram).
+  final IconData vehicleIcon;
 
   @override
   State<LineMap> createState() => _LineMapState();
@@ -165,7 +169,7 @@ class _LineMapState extends State<LineMap> {
                           ),
                           boxShadow: const [BoxShadow(blurRadius: 3, color: Colors.black38)],
                         ),
-                        child: Icon(Icons.directions_bus, color: Colors.white, size: b.selected ? 20 : 14),
+                        child: Icon(widget.vehicleIcon, color: Colors.white, size: b.selected ? 20 : 14),
                       ),
                     ),
                   ),

@@ -78,14 +78,14 @@ class HomeScreen extends StatelessWidget {
           useCase(
             Icons.timeline,
             'Suivi d\'une ligne',
-            'Horaires à un arrêt et position des bus sur la ligne.',
+            'Horaires à un arrêt et position des véhicules sur la ligne.',
             LineScreen(app: app),
           ),
           const SizedBox(height: 12),
           useCase(
             Icons.alt_route,
             'Arrêt → destination',
-            'Tous les bus directs vers votre arrêt d\'arrivée.',
+            'Tous les trajets directs vers votre arrêt d\'arrivée.',
             TripScreen(app: app),
           ),
           const SizedBox(height: 12),

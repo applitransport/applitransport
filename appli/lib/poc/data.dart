@@ -54,6 +54,41 @@ const typeLabels = {
   'telepherique': 'Téléphérique',
 };
 
+/// Nom du véhicule selon le type de ligne (« ce train », « 3 bus ») ; tous masculins en français.
+const _vehicles = {
+  'bus': ('bus', 'bus'),
+  'train': ('train', 'trains'),
+  'metro': ('métro', 'métros'),
+  'tram': ('tram', 'trams'),
+  'funiculaire': ('funiculaire', 'funiculaires'),
+  'telepherique': ('téléphérique', 'téléphériques'),
+};
+
+String vehicleWord(String type, {bool plural = false}) {
+  final v = _vehicles[type] ?? ('véhicule', 'véhicules');
+  return plural ? v.$2 : v.$1;
+}
+
+/// Icône du véhicule selon le type de ligne (carte, listes).
+IconData vehicleIcon(String type) => switch (type) {
+  'bus' => Icons.directions_bus,
+  'metro' => Icons.subway,
+  'tram' => Icons.tram,
+  'train' => Icons.train,
+  _ => Icons.directions_transit,
+};
+
+/// Type de ligne d'après le mode du calculateur IDFM (« Bus », « Train Transilien », « RER », « Tramway »…).
+String typeOfMode(String? mode) {
+  final m = (mode ?? '').toLowerCase();
+  if (m.contains('bus')) return 'bus';
+  if (m.contains('tram')) return 'tram';
+  if (m.contains('métro') || m.contains('metro')) return 'metro';
+  if (m.contains('funiculaire')) return 'funiculaire';
+  if (m.contains('câble') || m.contains('cable') || m.contains('téléphérique')) return 'telepherique';
+  return 'train';
+}
+
 class CatalogLine {
   /// Ligne du catalogue publié par l'usine (catalog.json.gz).
   CatalogLine.fromCatalog(Map<String, dynamic> j)

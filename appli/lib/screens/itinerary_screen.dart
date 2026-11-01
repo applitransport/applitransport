@@ -724,8 +724,8 @@ class _DetailScreen extends StatelessWidget {
                       : TextButton.icon(
                           icon: Icon(app.hasSchedules(lineId) ? Icons.timeline : Icons.download),
                           label: Text(
-                            '${app.hasSchedules(lineId) ? '' : 'Télécharger et '}suivre ce '
-                            '${(s.mode ?? '').toLowerCase().contains('bus') ? 'bus' : 'train'}',
+                            '${app.hasSchedules(lineId) ? 'Suivre' : 'Télécharger et suivre'} ce '
+                            '${vehicleWord(app.line(lineId)?.type ?? typeOfMode(s.mode))}',
                           ),
                           onPressed: () async {
                             // ligne absente de l'appareil : on la télécharge d'abord (quelques Ko)

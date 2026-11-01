@@ -182,6 +182,7 @@ class _LineScreenState extends State<LineScreen> {
           child: Stack(
             children: [
               LineMap(
+                vehicleIcon: vehicleIcon(l.type),
                 key: ValueKey('${l.id}/$_dir'),
                 shapes: [for (final v in d.variants) v.shape],
                 stops: d.stops,
@@ -378,7 +379,7 @@ class _LineScreenState extends State<LineScreen> {
         children: [
           Text(
             'Horaires à $_stop'
-            '${app.refreshedAt.containsKey(l.id) ? ' · $running bus en circulation dans ce sens' : ''}',
+            '${app.refreshedAt.containsKey(l.id) ? ' · $running ${vehicleWord(l.type, plural: running > 1)} en circulation dans ce sens' : ''}',
             style: Theme.of(context).textTheme.titleSmall,
           ),
           const SizedBox(height: 6),
@@ -398,8 +399,8 @@ class _LineScreenState extends State<LineScreen> {
     final String where;
     if (r == null) {
       where = app.refreshedAt.containsKey(line!.id)
-          ? 'PRIM ne donne pas d\'information sur ce bus : horaire théorique.'
-          : 'Appuyez sur Actualiser pour savoir où est ce bus.';
+          ? 'PRIM ne donne pas d\'information sur ce ${vehicleWord(line!.type)} : horaire théorique.'
+          : 'Appuyez sur Actualiser pour savoir où est ce ${vehicleWord(line!.type)}.';
     } else if (r.cancelled || r.cancelledStops.contains(p.index)) {
       where = 'Course supprimée${r.cancelled ? '' : ' à votre arrêt'}.';
     } else if (s != null) {
@@ -427,7 +428,7 @@ class _LineScreenState extends State<LineScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Bus de ${hhmm(p.time)} → ${v.headsign} · ${delayLabel(delay)}',
+                    '${_capitalized(vehicleWord(line!.type))} de ${hhmm(p.time)} → ${v.headsign} · ${delayLabel(delay)}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 2),
@@ -446,3 +447,5 @@ class _LineScreenState extends State<LineScreen> {
     );
   }
 }
+
+String _capitalized(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
