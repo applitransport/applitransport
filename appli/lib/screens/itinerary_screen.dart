@@ -328,7 +328,7 @@ class _PlaceField extends StatelessWidget {
   }
 
   Future<List<PlaceChoice>> _options(String text) async {
-    final q = text.toLowerCase().trim();
+    final q = searchKey(text);
     final stops = q.length >= 2 ? searchStopAreas(app.stopAreas.values, q, limit: 6) : const <StopArea>[];
     final local = <PlaceChoice>[
       if (q.isEmpty || 'ma position'.contains(q)) PlaceChoice.myPosition,

@@ -143,11 +143,12 @@ class _LinesTabState extends State<_LinesTab> {
 
   // Disponibles : catalogue filtré par type, réseau, numéro/nom ou arrêt
   Widget _available(BuildContext context) {
-    final q = _query.toLowerCase().trim();
+    final q = searchKey(_query);
     final byStop = <String, String>{}; // ligne -> nom de l'arrêt trouvé
     if (q.length >= 3) {
       for (final a in app.stopAreas.values) {
-        final hit = [a.name, ...a.aliases].where((n) => n.toLowerCase().contains(q)).firstOrNull;
+        final i = a.nameKeys.indexWhere((n) => n.contains(q));
+        final hit = i < 0 ? null : [a.name, ...a.aliases][i];
         if (hit != null) {
           for (final id in a.lines) {
             byStop.putIfAbsent(id, () => a.town.isEmpty ? hit : '$hit (${a.town})');
@@ -159,7 +160,7 @@ class _LinesTabState extends State<_LinesTab> {
       if (_types.isNotEmpty && !_types.contains(l.type)) return false;
       if (_network != null && l.network != _network) return false;
       if (q.isEmpty) return true;
-      return l.name.toLowerCase().contains(q) || l.longName.toLowerCase().contains(q) || byStop.containsKey(l.id);
+      return searchKey(l.name).contains(q) || searchKey(l.longName).contains(q) || byStop.containsKey(l.id);
     }).toList();
     final types = {for (final l in app.catalog) l.type}.toList()..sort();
     final missing = app.catalog.where((l) => !app.hasSchedules(l.id)).toList();

@@ -19,22 +19,63 @@ Color readableLineColor(Color c) => isGreyish(c) ? readableFallback : c;
 /// Couleur du texte sur une pastille dont la couleur a pu être remplacée.
 Color readableTextColor(Color line, Color text) => isGreyish(line) ? Colors.white : text;
 
+const _accents = {
+  'à': 'a',
+  'â': 'a',
+  'ä': 'a',
+  'á': 'a',
+  'ã': 'a',
+  'å': 'a',
+  'ç': 'c',
+  'é': 'e',
+  'è': 'e',
+  'ê': 'e',
+  'ë': 'e',
+  'î': 'i',
+  'ï': 'i',
+  'í': 'i',
+  'ì': 'i',
+  'ô': 'o',
+  'ö': 'o',
+  'ó': 'o',
+  'ò': 'o',
+  'õ': 'o',
+  'ù': 'u',
+  'û': 'u',
+  'ü': 'u',
+  'ú': 'u',
+  'ÿ': 'y',
+  'ñ': 'n',
+  'œ': 'oe',
+  'æ': 'ae',
+};
+
+const _separators = {'-', "'", '’', '_', '.', ',', '/', '(', ')'};
+final _spaces = RegExp(r'\s+');
+
+/// Forme de comparaison d'un texte : minuscules, sans accents, tirets et apostrophes remplacés par
+/// des espaces (« La Défense » et « la defense », « Gare de l'Est » et « gare de l est »).
+String searchKey(String s) {
+  final b = StringBuffer();
+  for (final ch in s.toLowerCase().split('')) {
+    b.write(_accents[ch] ?? (_separators.contains(ch) ? ' ' : ch));
+  }
+  return b.toString().replaceAll(_spaces, ' ').trim();
+}
+
 /// Zones d'arrêt correspondant à une saisie : d'abord celles dont le nom commence par le texte,
 /// puis les plus desservies (une gare passe avant un arrêt de bus homonyme).
 List<StopArea> searchStopAreas(Iterable<StopArea> areas, String query, {int limit = 50}) {
-  final q = query.toLowerCase().trim();
+  final q = searchKey(query);
   if (q.isEmpty) return areas.take(limit).toList();
   // chaque mot doit figurer dans le nom, un nom de quai ou la commune (« hameau montigny »)
-  final words = q.split(RegExp(r'\s+'));
-  bool matches(StopArea a) {
-    final names = [a.name, ...a.aliases].map((n) => n.toLowerCase()).toList();
-    final town = a.town.toLowerCase();
-    if (names.any((n) => n.contains(q))) return true;
-    return words.every((w) => town.contains(w) || names.any((n) => n.contains(w)));
-  }
+  final words = q.split(' ');
+  bool matches(StopArea a) =>
+      a.nameKeys.any((n) => n.contains(q)) ||
+      words.every((w) => a.townKey.contains(w) || a.nameKeys.any((n) => n.contains(w)));
 
   final hits = areas.where(matches).toList();
-  int rank(StopArea a) => a.name.toLowerCase().startsWith(q) ? 0 : (a.name.toLowerCase().contains(q) ? 1 : 2);
+  int rank(StopArea a) => a.nameKeys.first.startsWith(q) ? 0 : (a.nameKeys.first.contains(q) ? 1 : 2);
   hits.sort((a, b) {
     final r = rank(a).compareTo(rank(b));
     return r != 0 ? r : b.lines.length.compareTo(a.lines.length);
@@ -122,6 +163,12 @@ class StopArea {
   final String town;
   final List<String> aliases;
   final List<String> lines;
+
+  /// Formes de comparaison (voir searchKey), calculées une fois : nom de zone en premier, puis quais.
+  late final List<String> nameKeys = [
+    for (final n in [name, ...aliases]) searchKey(n),
+  ];
+  late final String townKey = searchKey(town);
 
   /// Nom affiché : le nom de zone, complété par un nom de quai quand il est plus parlant.
   String get label => aliases.length == 1 && aliases.first.length > name.length ? aliases.first : name;
