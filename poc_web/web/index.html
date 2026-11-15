@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>POC SQYBUS</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<aside id="panel">
+  <h1>SQYBUS <small>POC temps réel</small></h1>
+
+  <label>Ligne
+    <select id="line"></select>
+  </label>
+  <label>Direction
+    <select id="direction"></select>
+  </label>
+  <label>Arrêt
+    <select id="stop"></select>
+  </label>
+
+  <label class="toggle"><input type="checkbox" id="rtOn"> Temps réel PRIM <span class="hint">(≈ 1 requête/min)</span></label>
+
+  <details id="sim">
+    <summary>Simuler une date / heure</summary>
+    <label><input type="checkbox" id="simOn"> activer</label>
+    <div class="row">
+      <input type="date" id="simDay">
+      <input type="time" id="simTime" step="60">
+    </div>
+    <p class="hint">L'heure simulée avance en temps réel. Le temps réel PRIM est désactivé en simulation.</p>
+  </details>
+
+  <div id="status" class="card hidden"></div>
+  <p id="busCount" class="hint"></p>
+
+  <h2>Horaires <span id="dayLabel"></span></h2>
+  <ul id="departures"></ul>
+  <p id="source" class="hint"></p>
+</aside>
+<main id="map"></main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

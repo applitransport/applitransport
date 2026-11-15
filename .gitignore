@@ -1,0 +1,23 @@
+# secrets (jeton PRIM, signature de l'appli)
+.prim_key
+appli/android/key.properties
+*.jks
+*.keystore
+
+# environnements et fichiers générés
+.venv/
+__pycache__/
+appli/build/
+appli/.dart_tool/
+appli/.flutter-plugins-dependencies
+appli/linux/flutter/ephemeral/
+appli/android/.gradle/
+appli/android/local.properties
+appli/android/app/.cxx/
+
+# données (téléchargées ou produites ; publiées par le serveur dans le dépôt applitransport/donnees)
+/data/
+usine/out/
+
+# réglages propres à un poste de développement
+appli/pubspec_overrides.yaml
