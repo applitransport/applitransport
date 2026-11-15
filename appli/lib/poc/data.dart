@@ -157,9 +157,13 @@ class CatalogLine {
     return l.startsWith('$name ') ? l.substring(name.length + 1).trim() : l;
   }
 
+  /// Flèche entre terminus : « ⟷ » (U+27F7), qui n'a pas de forme émoji ; « ↔ » s'affiche en émoji
+  /// sur Android, même avec le sélecteur de variante texte.
+  static const terminiArrow = '\u27F7';
+
   /// Description d'une ligne dans les listes : nom long utile, puis terminus.
   String get description =>
-      [if (longLabel.isNotEmpty) longLabel, if (termini.isNotEmpty) termini.join(' ↔ ')].join(' · ');
+      [if (longLabel.isNotEmpty) longLabel, if (termini.isNotEmpty) termini.join(' $terminiArrow ')].join(' · ');
 
   String get typeLabel => typeLabels[type] ?? type;
 }

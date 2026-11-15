@@ -17,11 +17,14 @@ void main() {
   test('nom long sans répéter le nom court, puis terminus', () {
     final ter = _line('TER', 'TER Normandie', ['Paris Saint-Lazare', 'Rouen Rive Droite']);
     expect(ter.longLabel, 'Normandie');
-    expect(ter.description, 'Normandie · Paris Saint-Lazare ↔ Rouen Rive Droite');
+    expect(ter.description, 'Normandie · Paris Saint-Lazare ${CatalogLine.terminiArrow} Rouen Rive Droite');
   });
 
   test('nom long identique au nom court : seulement les terminus', () {
-    expect(_line('5104', '5104', ['Pas du Lac', 'Trappes Gare']).description, 'Pas du Lac ↔ Trappes Gare');
+    expect(
+      _line('5104', '5104', ['Pas du Lac', 'Trappes Gare']).description,
+      'Pas du Lac ${CatalogLine.terminiArrow} Trappes Gare',
+    );
     expect(_line('T6', 't6').longLabel, '');
   });
 
