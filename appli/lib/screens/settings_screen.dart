@@ -137,28 +137,7 @@ class _LinesTabState extends State<_LinesTab> {
     ],
   );
 
-  Widget _lineTitle(CatalogLine l) => Row(
-    children: [
-      LineBadge(name: l.name, color: l.color, textColor: l.textColor),
-      const SizedBox(width: 8),
-      Flexible(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l.typeLabel, overflow: TextOverflow.ellipsis),
-            // nom long et terminus : distinguent les lignes au nom court identique (« TER »)
-            if (l.description.isNotEmpty)
-              Text(
-                l.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-          ],
-        ),
-      ),
-    ],
-  );
+  Widget _lineTitle(CatalogLine l) => LineTitle(line: l);
 
   // Disponibles : catalogue filtré par type, réseau, numéro/nom ou arrêt
   Widget _available(BuildContext context) {
