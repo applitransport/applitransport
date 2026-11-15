@@ -136,6 +136,7 @@ class CatalogLine {
     : id = lineCode(j['route_id']),
       name = j['short_name'],
       longName = j['long_name'] ?? '',
+      termini = List<String>.from(j['termini'] ?? const []),
       type = j['type'],
       network = j['network'],
       color = readableLineColor(hexColor(j['color'])),
@@ -145,6 +146,20 @@ class CatalogLine {
   final String id, name, longName, type, network;
   final Color color, textColor;
   final int size;
+
+  /// Terminus principaux (« Paris Saint-Lazare », « Rouen Rive Droite ») ; vide dans les anciens catalogues.
+  final List<String> termini;
+
+  /// Nom long sans la répétition du nom court (« TER Normandie » → « Normandie »), vide s'il n'apporte rien.
+  String get longLabel {
+    final l = longName.trim();
+    if (l.isEmpty || searchKey(l) == searchKey(name)) return '';
+    return l.startsWith('$name ') ? l.substring(name.length + 1).trim() : l;
+  }
+
+  /// Description d'une ligne dans les listes : nom long utile, puis terminus.
+  String get description =>
+      [if (longLabel.isNotEmpty) longLabel, if (termini.isNotEmpty) termini.join(' ↔ ')].join(' · ');
 
   String get typeLabel => typeLabels[type] ?? type;
 }

@@ -1,6 +1,6 @@
 """Fabrique, depuis la base SQLite, les fichiers téléchargés par l'appli :
 
-  out/public/catalog.json.gz        catalogue : réseaux, lignes (avec version), zones d'arrêt et lignes qui y passent
+  out/public/catalog.json.gz        catalogue : réseaux, lignes (version, terminus principaux), zones d'arrêt et lignes qui y passent
   out/public/lines/<ligne>.json.gz  un paquet par ligne : arrêts, tracés, parcours types, courses, calendriers
 
 out/public/ est exactement ce qui est publié (GitHub Pages, ou serveur local pendant le développement).
@@ -205,6 +205,24 @@ def still_valid(old, new, today):
     return True
 
 
+def termini(package):
+    """Terminus principaux d'une ligne pour le catalogue (« Paris Saint-Lazare », « Rouen Rive Droite ») :
+    premier et dernier arrêts du parcours le plus fréquent du sens le plus fréquenté. Distingue les lignes
+    au nom court identique (« TER », numéros de bus repris d'un réseau à l'autre)."""
+    per_pattern = Counter(t[1] for t in package["trips"])
+    per_direction = Counter()
+    for i, n in per_pattern.items():
+        per_direction[package["patterns"][i]["direction_id"]] += n
+    if not per_direction:
+        return []
+    direction = min(per_direction, key=lambda d: (-per_direction[d], d))
+    main = min((i for i in per_pattern if package["patterns"][i]["direction_id"] == direction),
+               key=lambda i: (-per_pattern[i], i))
+    stops = package["patterns"][main]["stops"]
+    first, last = package["stops"][stops[0]][0], package["stops"][stops[-1]][0]
+    return [first] if first == last else [first, last]
+
+
 def export(db_file=DB_FILE, out_dir=PUBLIC_DIR, feed_info=None):
     t0 = time.time()
     db = sqlite3.connect(db_file)
@@ -234,7 +252,8 @@ def export(db_file=DB_FILE, out_dir=PUBLIC_DIR, feed_info=None):
             write_gz(path, package)
         size = path.stat().st_size
         total_gz += size
-        catalog_lines.append({**route, "file": f"lines/{path.name}", "version": package["version"], "size": size})
+        catalog_lines.append({**route, "termini": termini(package), "file": f"lines/{path.name}",
+                              "version": package["version"], "size": size})
         for sid in stop_ids:
             area_lines[stop_parent.get(sid, sid)].add(route_id)
         if i % 200 == 0:

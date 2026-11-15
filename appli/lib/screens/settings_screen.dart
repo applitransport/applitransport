@@ -141,7 +141,22 @@ class _LinesTabState extends State<_LinesTab> {
     children: [
       LineBadge(name: l.name, color: l.color, textColor: l.textColor),
       const SizedBox(width: 8),
-      Flexible(child: Text(l.typeLabel, overflow: TextOverflow.ellipsis)),
+      Flexible(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l.typeLabel, overflow: TextOverflow.ellipsis),
+            // nom long et terminus : distinguent les lignes au nom court identique (« TER »)
+            if (l.description.isNotEmpty)
+              Text(
+                l.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+          ],
+        ),
+      ),
     ],
   );
 
@@ -164,7 +179,10 @@ class _LinesTabState extends State<_LinesTab> {
       if (_types.isNotEmpty && !_types.contains(l.type)) return false;
       if (_network != null && l.network != _network) return false;
       if (q.isEmpty) return true;
-      return searchKey(l.name).contains(q) || searchKey(l.longName).contains(q) || byStop.containsKey(l.id);
+      return searchKey(l.name).contains(q) ||
+          searchKey(l.longName).contains(q) ||
+          l.termini.any((t) => searchKey(t).contains(q)) ||
+          byStop.containsKey(l.id);
     }).toList();
     final types = {for (final l in app.catalog) l.type}.toList()..sort();
     final missing = app.catalog.where((l) => !app.hasSchedules(l.id)).toList();
