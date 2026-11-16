@@ -12,6 +12,7 @@ import 'package:latlong2/latlong.dart';
 import '../data/geocoder.dart';
 import '../data/location.dart';
 import '../data/realtime.dart';
+import '../data/track.dart' show distanceMeters;
 import '../data/traffic.dart';
 import '../poc/app_state.dart';
 import '../poc/data.dart';
@@ -41,6 +42,15 @@ class PlaceChoice {
   /// Lieu ou adresse : « Arrêt le plus proche : Lycée Descartes (250 m) ».
   final String? near;
   static const myPosition = PlaceChoice('Ma position', 'GPS du téléphone', null, 'position');
+}
+
+/// Longueur d'un tracé à pied (m), 0 s'il n'y en a pas.
+double walkLength(List<LatLng> shape) {
+  var m = 0.0;
+  for (var i = 1; i < shape.length; i++) {
+    m += distanceMeters(shape[i - 1], shape[i]);
+  }
+  return m;
 }
 
 /// Heures d'un itinéraire corrigées du temps réel de chaque étape, et correspondances compromises.
@@ -563,6 +573,8 @@ class _JourneyCard extends StatelessWidget {
                   Icon(modeIcon(s.mode), size: 16),
                   const SizedBox(width: 2),
                   LineBadge(name: s.lineCode ?? '?', color: s.color, textColor: s.textColor, small: true),
+                  // heure de départ de ce transport (corrigée du temps réel)
+                  Text(' (${hhmm(timed.dep[k])})', style: const TextStyle(fontSize: 12)),
                 ],
               ),
               if (r != null)
@@ -579,7 +591,13 @@ class _JourneyCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.directions_walk, size: 16),
-              Text('${(s.duration / 60).ceil()}', style: const TextStyle(fontSize: 12)),
+              Text(
+                [
+                  '${(s.duration / 60).ceil()} min',
+                  if (walkLength(s.shape) case final m when m > 0) distanceLabel(m),
+                ].join(' · '),
+                style: const TextStyle(fontSize: 12),
+              ),
             ],
           ),
         );
