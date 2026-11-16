@@ -36,6 +36,7 @@ class LineMap extends StatefulWidget {
     required this.stops,
     required this.color,
     this.myStop,
+    this.toStop,
     this.buses = const [],
     this.onBusTap,
     this.vehicleIcon = Icons.directions_bus,
@@ -55,6 +56,9 @@ class LineMap extends StatefulWidget {
   final List<Stop> stops;
   final Color color;
   final Stop? myStop;
+
+  /// Arrêt d'arrivée, marqué « Arrivée » (Quelle ligne prendre ?).
+  final Stop? toStop;
   final List<MapBus> buses;
   final void Function(String busId)? onBusTap;
 
@@ -146,31 +150,12 @@ class _LineMapState extends State<LineMap> {
                   ),
               ],
             ),
-            if (mine != null)
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: mine.pos,
-                    width: 120,
-                    height: 46,
-                    alignment: Alignment.topCenter,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: scheme.inverseSurface,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: Text('Votre arrêt', style: TextStyle(color: scheme.onInverseSurface, fontSize: 11)),
-                        ),
-                        Icon(Icons.location_on, color: scheme.inverseSurface, size: 24),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            MarkerLayer(
+              markers: [
+                if (mine != null) _stopFlag(mine, 'Votre arrêt', scheme.inverseSurface, scheme.onInverseSurface),
+                if (widget.toStop case final to?) _stopFlag(to, 'Arrivée', Colors.green.shade700, Colors.white),
+              ],
+            ),
             MarkerLayer(
               markers: [
                 for (final b in [...widget.buses]..sort((a, b) => a.selected ? 1 : (b.selected ? -1 : 0)))
@@ -259,4 +244,23 @@ Widget _alertDot(double size) => Container(
     border: Border.all(color: Colors.white, width: 1.5),
   ),
   child: Icon(Icons.priority_high, color: Colors.white, size: size * 0.7),
+);
+
+/// Repère d'arrêt avec une étiquette (« Votre arrêt », « Arrivée »).
+Marker _stopFlag(Stop stop, String label, Color background, Color foreground) => Marker(
+  point: stop.pos,
+  width: 120,
+  height: 46,
+  alignment: Alignment.topCenter,
+  child: Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+        decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(3)),
+        child: Text(label, style: TextStyle(color: foreground, fontSize: 11)),
+      ),
+      Icon(Icons.location_on, color: background, size: 24),
+    ],
+  ),
 );

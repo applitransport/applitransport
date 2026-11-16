@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../data/realtime.dart';
 import '../poc/app_state.dart';
 import '../poc/data.dart';
+import '../poc/line_vehicles.dart';
 import '../poc/nearby.dart';
 import '../poc/position.dart';
 import '../widgets/line_badge.dart';
@@ -125,6 +126,9 @@ class _TripScreenState extends State<TripScreen> {
   bool _locating = false;
   String? _nearbyError;
 
+  /// Position obtenue dans cet écran (« Me localiser ») : le point bleu s'affiche sur les cartes.
+  bool _located = false;
+
   @override
   void initState() {
     super.initState();
@@ -146,6 +150,7 @@ class _TripScreenState extends State<TripScreen> {
       if (me == null) {
         if (ask) _nearbyError = 'Position indisponible : localisation désactivée ou refusée.';
       } else {
+        _located = true;
         _nearby = nearbyAreas(_boardingAreas, me);
       }
     });
@@ -620,6 +625,7 @@ class _TripScreenState extends State<TripScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      showDragHandle: true, // poignée : on ferme aussi en faisant glisser vers le bas
       builder: (context) => ListenableBuilder(
         listenable: app,
         builder: (context, _) {
@@ -627,6 +633,14 @@ class _TripScreenState extends State<TripScreen> {
           final r = _rt(j);
           final delay = r?.delayAt(j.from);
           final s = busStatus(j.variant, j.trip, now, r);
+          // ce bus, comme dans le suivi de ligne : vert s'il est vu par un voyageur, sinon rouge (PRIM
+          // ou horaire)
+          final dirIndex = j.line.directions.indexOf(j.direction);
+          final id = '${j.variantIndex}/${j.trip}';
+          final bus = [
+            for (final b in lineVehicles(app, j.line, j.direction, dirIndex, show: true, selected: id, ride: app.ride))
+              if (b.id == id) b,
+          ];
           final text = r == null
               ? (app.refreshedAt.containsKey(j.line.id)
                     ? 'PRIM ne donne pas d\'information sur ce ${vehicleWord(j.line.type)} : horaire théorique.'
@@ -645,19 +659,24 @@ class _TripScreenState extends State<TripScreen> {
                   leading: LineBadge(name: j.line.name, color: j.line.color, textColor: j.line.textColor),
                   title: Text('→ ${j.variant.headsign} · ${delayLabel(delay)}'),
                   subtitle: Text(text),
+                  // fermer : ✕, ou faire glisser le panneau vers le bas
+                  trailing: IconButton(
+                    tooltip: 'Fermer',
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
                 ),
                 Expanded(
                   child: LineMap(
-                    showMe: app.showMyPosition,
+                    showMe: app.showMyPosition || _located,
                     vehicleIcon: vehicleIcon(j.line.type),
+                    confirmationColors: true,
                     shapes: [j.variant.shape],
                     stops: j.variant.stops,
                     color: j.line.color,
                     myStop: j.variant.stops[j.from],
-                    buses: [
-                      if (delay != null && s != null)
-                        MapBus(id: '${j.trip}', position: s.position, selected: true, realtime: true),
-                    ],
+                    toStop: j.variant.stops[j.to],
+                    buses: bus,
                   ),
                 ),
               ],
