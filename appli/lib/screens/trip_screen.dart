@@ -624,6 +624,8 @@ class _TripScreenState extends State<TripScreen> {
   }
 
   void _showBus(BuildContext context, _Journey j) {
+    // sinon, à la fermeture, le champ d'arrivée reprend le curseur et rouvre le clavier
+    FocusManager.instance.primaryFocus?.unfocus();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
