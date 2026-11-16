@@ -9,12 +9,14 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../data/geocoder.dart';
 import '../data/location.dart';
 import '../data/realtime.dart';
 import '../data/traffic.dart';
 import '../poc/app_state.dart';
 import '../poc/data.dart';
 import '../poc/itineraries.dart';
+import '../poc/nearby.dart';
 import '../poc/position.dart';
 import '../widgets/line_badge.dart';
 import '../widgets/refresh_controls.dart';
@@ -30,10 +32,13 @@ IconData modeIcon(String? mode) {
 
 /// Lieu choisi : [ref] = identifiant pour le calculateur (null : ma position, résolue au moment de chercher).
 class PlaceChoice {
-  const PlaceChoice(this.label, this.detail, this.ref, this.kind);
+  const PlaceChoice(this.label, this.detail, this.ref, this.kind, {this.near});
   final String label, detail;
   final String? ref;
-  final String kind; // position, arret, adresse
+  final String kind; // position, arret, lieu, adresse
+
+  /// Lieu ou adresse : « Arrêt le plus proche : Lycée Descartes (250 m) ».
+  final String? near;
   static const myPosition = PlaceChoice('Ma position', 'GPS du téléphone', null, 'position');
 }
 
@@ -358,6 +363,14 @@ class _PlaceFieldState extends State<_PlaceField> {
     return n.isEmpty ? '' : ' · ${n.join(' · ')}';
   }
 
+  static final _geocoder = Geocoder();
+
+  /// « Arrêt le plus proche : Lycée Descartes (250 m) », calculé sur le téléphone.
+  String? _nearLabel(LatLng pos) {
+    final n = nearbyAreas(app.stopAreas.values, pos, radius: 2000, limit: 1).firstOrNull;
+    return n == null ? null : 'Arrêt le plus proche : ${n.$1.label} (${distanceLabel(n.$2)})';
+  }
+
   Future<List<PlaceChoice>> _options(String text) async {
     final q = searchKey(text);
     final stops = q.length >= 2 ? searchStopAreas(app.stopAreas.values, q, limit: 6) : const <StopArea>[];
@@ -371,15 +384,29 @@ class _PlaceFieldState extends State<_PlaceField> {
           'arret',
         ),
     ];
-    // adresses demandées au calculateur seulement si c'est probablement une adresse (numéro de rue)
-    // ou si peu d'arrêts correspondent : chaque recherche d'adresse coûte une requête
-    if (q.length < 4 || !(RegExp(r'\d').hasMatch(q) || stops.length < 3)) return local;
-    // adresses : une requête « calculateur », seulement quand la frappe s'arrête
+    if (q.length < 3) return local;
+    // lieux et adresses (IGN), seulement quand la frappe s'arrête
     _latest = q;
-    await Future.delayed(const Duration(milliseconds: 700));
+    await Future.delayed(const Duration(milliseconds: 450));
     if (_latest != q) return local;
-    final addresses = await app.searchAddresses(text.trim());
-    return [...local, for (final (name, id) in addresses) PlaceChoice(name, 'Adresse', id, 'adresse')];
+    final places = await _geocoder.search(text.trim());
+    if (_latest != q) return local;
+    if (places.isEmpty && RegExp(r'\d').hasMatch(q)) {
+      // géocodeur indisponible : adresses du calculateur PRIM (une requête)
+      final addresses = await app.searchAddresses(text.trim());
+      return [...local, for (final (name, id) in addresses) PlaceChoice(name, 'Adresse', id, 'adresse')];
+    }
+    return [
+      ...local,
+      for (final g in places)
+        PlaceChoice(
+          g.name,
+          g.detail,
+          '${g.pos.longitude};${g.pos.latitude}', // coordonnées, comprises par le calculateur
+          g.isPoi ? 'lieu' : 'adresse',
+          near: _nearLabel(g.pos),
+        ),
+    ];
   }
 
   @override
@@ -403,11 +430,12 @@ class _PlaceFieldState extends State<_PlaceField> {
                   dense: true,
                   leading: Icon(switch (p.kind) {
                     'position' => Icons.my_location,
-                    'arret' => Icons.place_outlined,
+                    'arret' => Icons.directions_bus_outlined,
+                    'lieu' => Icons.place_outlined,
                     _ => Icons.home_outlined,
                   }),
                   title: Text(p.label),
-                  subtitle: Text(p.detail),
+                  subtitle: Text([p.detail, ?p.near].join('\n')),
                   onTap: () => onSelected(p),
                 ),
             ],
@@ -431,7 +459,10 @@ class _PlaceFieldState extends State<_PlaceField> {
         onChanged: (_) => onSet(null), // texte modifié : il faut rechoisir une proposition
         decoration: InputDecoration(
           labelText: label,
-          hintText: 'Ma position, adresse ou arrêt',
+          hintText: 'Ma position, arrêt, lieu ou adresse',
+          // lieu ou adresse choisi : l'arrêt le plus proche
+          helperText: value?.near,
+          helperMaxLines: 2,
           prefixIcon: Icon(icon),
           isDense: true,
           border: const OutlineInputBorder(),
