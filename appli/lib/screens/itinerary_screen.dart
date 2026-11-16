@@ -77,11 +77,15 @@ class _Timed {
 }
 
 class ItineraryScreen extends StatefulWidget {
-  const ItineraryScreen({super.key, required this.app, this.from, this.to});
+  const ItineraryScreen({super.key, required this.app, this.from, this.to, this.toQuery});
   final AppState app;
 
   /// Lieux préremplis (depuis « Quelle ligne prendre ? » quand il n'y a pas de ligne directe).
   final PlaceChoice? from, to;
+
+  /// Texte d'arrivée à chercher (depuis « Quelle ligne prendre ? » quand ce n'est pas un arrêt) :
+  /// saisi dans le champ, suggestions ouvertes.
+  final String? toQuery;
 
   @override
   State<ItineraryScreen> createState() => _ItineraryScreenState();
@@ -213,7 +217,14 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
                       onSet: (p) => _from = p,
                     ),
                     const SizedBox(height: 8),
-                    _PlaceField(app: app, label: 'Arrivée', icon: Icons.flag, value: _to, onSet: (p) => _to = p),
+                    _PlaceField(
+                      app: app,
+                      label: 'Arrivée',
+                      icon: Icons.flag,
+                      value: _to,
+                      onSet: (p) => _to = p,
+                      initialText: _to == null ? widget.toQuery : null,
+                    ),
                   ],
                 ),
               ),
@@ -309,19 +320,36 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
 }
 
 /// Champ de lieu : ma position, arrêts du catalogue (sur l'appareil), adresses (calculateur).
-class _PlaceField extends StatelessWidget {
+class _PlaceField extends StatefulWidget {
   const _PlaceField({
     required this.app,
     required this.label,
     required this.icon,
     required this.value,
     required this.onSet,
+    this.initialText,
   });
   final AppState app;
   final String label;
   final IconData icon;
   final PlaceChoice? value;
   final void Function(PlaceChoice?) onSet;
+
+  /// Texte à chercher dès l'ouverture (saisi, champ actif, suggestions ouvertes).
+  final String? initialText;
+
+  @override
+  State<_PlaceField> createState() => _PlaceFieldState();
+}
+
+class _PlaceFieldState extends State<_PlaceField> {
+  bool _prefilled = false;
+
+  AppState get app => widget.app;
+  String get label => widget.label;
+  IconData get icon => widget.icon;
+  PlaceChoice? get value => widget.value;
+  void Function(PlaceChoice?) get onSet => widget.onSet;
 
   static String _latest = '';
 
@@ -387,18 +415,29 @@ class _PlaceField extends StatelessWidget {
         ),
       ),
     ),
-    fieldViewBuilder: (context, ctrl, focus, onSubmit) => TextField(
-      controller: ctrl,
-      focusNode: focus,
-      onChanged: (_) => onSet(null), // texte modifié : il faut rechoisir une proposition
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: 'Ma position, adresse ou arrêt',
-        prefixIcon: Icon(icon),
-        isDense: true,
-        border: const OutlineInputBorder(),
-      ),
-    ),
+    fieldViewBuilder: (context, ctrl, focus, onSubmit) {
+      // texte venu d'un autre écran : saisi après le premier affichage, ce qui ouvre les suggestions
+      if (!_prefilled && widget.initialText != null) {
+        _prefilled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          focus.requestFocus();
+          ctrl.text = widget.initialText!;
+        });
+      }
+      return TextField(
+        controller: ctrl,
+        focusNode: focus,
+        onChanged: (_) => onSet(null), // texte modifié : il faut rechoisir une proposition
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: 'Ma position, adresse ou arrêt',
+          prefixIcon: Icon(icon),
+          isDense: true,
+          border: const OutlineInputBorder(),
+        ),
+      );
+    },
   );
 }
 

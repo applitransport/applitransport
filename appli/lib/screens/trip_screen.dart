@@ -191,6 +191,49 @@ class _TripScreenState extends State<TripScreen> {
     ),
   );
 
+  /// Le texte tapé n'est pas un nom d'arrêt (un lieu, une adresse) : Itinéraire le cherche.
+  Widget _notAStop(BuildContext context, String query) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '« $query » n\'est pas un nom d\'arrêt.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Pour un lieu ou une adresse, Itinéraire trouve le trajet et les arrêts à proximité (internet).',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ItineraryScreen(
+                  app: app,
+                  from: _origin == null
+                      ? null
+                      : PlaceChoice(
+                          _origin!.label,
+                          _origin!.town.isEmpty ? 'Arrêt' : _origin!.town,
+                          'stop_area:${_origin!.id}',
+                          'arret',
+                        ),
+                  toQuery: query,
+                ),
+              ),
+            ),
+            icon: const Icon(Icons.directions),
+            label: const Text('Chercher ce lieu avec Itinéraire'),
+          ),
+        ],
+      ),
+    ),
+  );
+
   /// Arrêts près de moi : dans l'espace libre tant que l'arrêt de départ n'est pas choisi.
   Widget _nearbyList(BuildContext context) {
     final theme = Theme.of(context);
@@ -497,7 +540,8 @@ class _TripScreenState extends State<TripScreen> {
       final q = _queries["Arrêt d'arrivée"] ?? '';
       if (searchKey(q).length >= 2 && searchStopAreas(_destinations, q).isEmpty) {
         final elsewhere = searchStopAreas(_boardingAreas, q, limit: 1).firstOrNull;
-        if (elsewhere != null) return _noDirect(context, elsewhere);
+        // un arrêt sans ligne directe, ou pas un arrêt du tout (lieu, adresse) : Itinéraire
+        return elsewhere != null ? _noDirect(context, elsewhere) : _notAStop(context, q.trim());
       }
     }
     String? message;
