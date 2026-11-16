@@ -23,6 +23,7 @@ import '../widgets/line_badge.dart';
 import '../widgets/place_preview.dart';
 import '../widgets/refresh_controls.dart';
 import 'line_screen.dart';
+import 'walk_nav_screen.dart';
 
 IconData modeIcon(String? mode) {
   final m = (mode ?? '').toLowerCase();
@@ -707,6 +708,7 @@ class _DetailScreen extends StatelessWidget {
                         subtitle: const Text('Relancez la recherche pour un autre itinéraire.'),
                       ),
                     ),
+                  _goButton(context, t),
                   for (var k = 0; k < j.sections.length; k++) _step(context, t, k),
                 ],
               ),
@@ -716,6 +718,41 @@ class _DetailScreen extends StatelessWidget {
       );
     },
   );
+
+  /// « Partir » : navigation à pied jusqu'au premier transport (ou jusqu'à l'arrivée).
+  Widget _goButton(BuildContext context, _Timed t) {
+    final j = t.journey;
+    final k = j.sections.indexWhere((s) => s.isTransit);
+    final walk = [
+      for (final s in k < 0 ? j.sections : j.sections.sublist(0, k))
+        if (!s.isTransit) ...s.shape,
+    ];
+    final bus = k < 0 ? null : j.sections[k];
+    final target = bus?.from ?? j.sections.last.to;
+    final path = walk.isNotEmpty ? walk : [?target?.pos];
+    if (path.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: FilledButton.icon(
+        icon: const Icon(Icons.directions_walk),
+        label: Text(bus == null ? 'Partir' : 'Partir vers ${bus.from?.name ?? 'l\'arrêt'}'),
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => WalkNavScreen(
+              app: app,
+              path: path,
+              target: target?.name ?? 'Arrivée',
+              lineCode: bus?.lineCode,
+              lineId: bus?.lineId,
+              departure: bus == null ? null : t.dep[k],
+              fromArea: bus?.from?.area,
+              toArea: bus?.to?.area,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _map(BuildContext context, Journey j) {
     final all = [for (final s in j.sections) ...s.shape];
