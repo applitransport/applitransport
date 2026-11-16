@@ -627,7 +627,7 @@ class _TripScreenState extends State<TripScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true, // poignée : on ferme aussi en faisant glisser vers le bas
+      // sans poignée : on ferme avec la croix ou en faisant glisser le panneau vers le bas
       builder: (context) => _Ticking(
         // recalcul chaque seconde : la position théorique avance
         builder: (context) => ListenableBuilder(
@@ -667,13 +667,13 @@ class _TripScreenState extends State<TripScreen> {
               return 'dans ${duration(left)} (${hhmm(t)})';
             }
 
-            final small = Theme.of(context).textTheme.bodyMedium;
+            final small = Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.25);
             return SizedBox(
-              height: MediaQuery.of(context).size.height * 0.6,
+              height: MediaQuery.of(context).size.height * 0.7,
               child: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 4, 8),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 4, 6),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
