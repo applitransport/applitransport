@@ -19,6 +19,7 @@ import '../poc/itineraries.dart';
 import '../poc/nearby.dart';
 import '../poc/position.dart';
 import '../widgets/line_badge.dart';
+import '../widgets/place_preview.dart';
 import '../widgets/refresh_controls.dart';
 import 'line_screen.dart';
 
@@ -183,6 +184,8 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
                 RefreshControls(
                   key: ValueKey(_search),
                   onRefresh: _refresh,
+                  single: true, // Actualiser seul, comme sur les autres écrans
+                  manualCooldown: const Duration(seconds: 10),
                   autoMinutes: app.autoMinutes,
                   lastRefresh: _refreshedAt,
                   now: app.now,
@@ -219,7 +222,10 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
                       label: 'Départ',
                       icon: Icons.trip_origin,
                       value: _from,
-                      onSet: (p) => _from = p,
+                      onSet: (p) => setState(() {
+                        _from = p;
+                        _search = null; // lieu changé : l'aperçu remplace les anciens résultats
+                      }),
                     ),
                     const SizedBox(height: 8),
                     _PlaceField(
@@ -227,7 +233,10 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
                       label: 'Arrivée',
                       icon: Icons.flag,
                       value: _to,
-                      onSet: (p) => _to = p,
+                      onSet: (p) => setState(() {
+                        _to = p;
+                        _search = null; // lieu changé : l'aperçu remplace les anciens résultats
+                      }),
                       initialText: _to == null ? widget.toQuery : null,
                     ),
                   ],
@@ -287,8 +296,57 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
     );
   }
 
+  // --- aperçu avant recherche ---------------------------------------------------------
+  String? _previewKey;
+  Future<(LatLng?, LatLng?, LatLng?)>? _previewFuture;
+
+  /// Coordonnées d'un lieu choisi : arrêt du catalogue, coordonnées « lon;lat », ma position.
+  Future<LatLng?> _posOf(PlaceChoice p) async {
+    if (p.kind == 'position') return currentPosition();
+    final ref = p.ref ?? '';
+    if (ref.startsWith('stop_area:')) return app.stopAreas[ref.substring(10)]?.pos;
+    final parts = ref.split(';');
+    if (parts.length == 2) {
+      final lon = double.tryParse(parts[0]), lat = double.tryParse(parts[1]);
+      if (lon != null && lat != null) return LatLng(lat, lon);
+    }
+    return null;
+  }
+
+  Widget _preview() {
+    final key = '${_from!.label}|${_from!.ref}>${_to!.label}|${_to!.ref}';
+    if (key != _previewKey) {
+      _previewKey = key;
+      _previewFuture = () async {
+        final a = await _posOf(_from!), b = await _posOf(_to!);
+        // point bleu : position déjà connue (ma position choisie) ou affichage activé dans les réglages
+        final me = _from!.kind == 'position'
+            ? a
+            : _to!.kind == 'position'
+            ? b
+            : (app.showMyPosition ? await currentPosition() : null);
+        return (a, b, me);
+      }();
+    }
+    return FutureBuilder(
+      future: _previewFuture,
+      builder: (context, snap) {
+        final r = snap.data;
+        if (r == null || r.$1 == null || r.$2 == null) {
+          return Center(
+            child: snap.connectionState == ConnectionState.done
+                ? const Text('Appuyez sur Rechercher.')
+                : const CircularProgressIndicator(),
+          );
+        }
+        return PlacePreview(from: r.$1!, to: r.$2!, me: r.$3);
+      },
+    );
+  }
+
   Widget _results(BuildContext context) {
     final s = _search;
+    if (s == null && _from != null && _to != null) return _preview();
     if (s == null) {
       return const Center(
         child: Padding(
@@ -553,7 +611,7 @@ class _JourneyCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    timed.start <= now ? 'en cours' : 'dans ${duration(timed.start - now)}',
+                    timed.start <= now ? 'partez maintenant' : 'dans ${duration(timed.start - now)}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
