@@ -333,6 +333,8 @@ class _TripScreenState extends State<TripScreen> {
                   key: ValueKey('${_origin!.id}>${_destination!.id}'),
                   // une seule requête « arrêt » donne les passages de toutes les lignes au départ
                   onRefresh: () => app.refreshStop(_origin!.id, downloaded.map((l) => l.id)),
+                  single: true, // Actualiser seul, comme sur les autres écrans
+                  manualCooldown: const Duration(seconds: 10),
                   autoMinutes: app.autoMinutes,
                   lastRefresh: refreshed,
                   now: app.now,
@@ -626,64 +628,141 @@ class _TripScreenState extends State<TripScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true, // poignée : on ferme aussi en faisant glisser vers le bas
-      builder: (context) => ListenableBuilder(
-        listenable: app,
-        builder: (context, _) {
-          final now = app.nowSec();
-          final r = _rt(j);
-          final delay = r?.delayAt(j.from);
-          final s = busStatus(j.variant, j.trip, now, r);
-          // ce bus, comme dans le suivi de ligne : vert s'il est vu par un voyageur, sinon rouge (PRIM
-          // ou horaire)
-          final dirIndex = j.line.directions.indexOf(j.direction);
-          final id = '${j.variantIndex}/${j.trip}';
-          final bus = [
-            for (final b in lineVehicles(app, j.line, j.direction, dirIndex, show: true, selected: id, ride: app.ride))
-              if (b.id == id) b,
-          ];
-          final text = r == null
-              ? (app.refreshedAt.containsKey(j.line.id)
-                    ? 'PRIM ne donne pas d\'information sur ce ${vehicleWord(j.line.type)} : horaire théorique.'
-                    : 'Appuyez sur Actualiser pour savoir où est ce ${vehicleWord(j.line.type)}.')
-              : r.cancelled
-              ? 'Course supprimée.'
-              : s == null
-              ? 'Pas encore parti de ${j.variant.stops.first.name}.'
-              : 'A passé ${j.variant.stops[s.lastStop].name} il y a ${duration(s.sinceSec)} · '
-                    'prochain arrêt ${j.variant.stops[s.nextStop].name}.';
-          return SizedBox(
-            height: MediaQuery.of(context).size.height * 0.6,
-            child: Column(
-              children: [
-                ListTile(
-                  leading: LineBadge(name: j.line.name, color: j.line.color, textColor: j.line.textColor),
-                  title: Text('→ ${j.variant.headsign} · ${delayLabel(delay)}'),
-                  subtitle: Text(text),
-                  // fermer : ✕, ou faire glisser le panneau vers le bas
-                  trailing: IconButton(
-                    tooltip: 'Fermer',
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
+      builder: (context) => _Ticking(
+        // recalcul chaque seconde : la position théorique avance
+        builder: (context) => ListenableBuilder(
+          listenable: app,
+          builder: (context, _) {
+            final now = app.nowSec();
+            final r = _rt(j);
+            final times = tripTimes(j.variant, j.trip, r);
+            final dirIndex = j.line.directions.indexOf(j.direction);
+            final id = '${j.variantIndex}/${j.trip}';
+            // ce véhicule, comme dans le suivi de ligne : vert s'il est vu par un voyageur, sinon rouge
+            final bus = [
+              for (final b in lineVehicles(
+                app,
+                j.line,
+                j.direction,
+                dirIndex,
+                show: true,
+                selected: id,
+                ride: app.ride,
+              ))
+                if (b.id == id) b,
+            ];
+            final crowd = bus.any((b) => b.crowd);
+            final cancelled = r?.cancelled ?? false;
+            final (source, sourceColor) = cancelled
+                ? ('supprimé', Colors.red.shade700)
+                : crowd
+                ? ('vu par un voyageur', Colors.green.shade700)
+                : r != null
+                ? ('PRIM', Colors.red.shade400)
+                : ('théorique', Colors.grey);
+            String eta(int t) {
+              final left = t - now;
+              if (left < -30) return 'passé à ${hhmm(t)}';
+              if (left < 60) return 'maintenant (${hhmm(t)})';
+              return 'dans ${duration(left)} (${hhmm(t)})';
+            }
+
+            final small = Theme.of(context).textTheme.bodyMedium;
+            return SizedBox(
+              height: MediaQuery.of(context).size.height * 0.6,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 4, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            LineBadge(name: j.line.name, color: j.line.color, textColor: j.line.textColor),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                '→ ${j.variant.headsign}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ),
+                            // Actualiser : serveur communautaire à chaque appui, PRIM au plus toutes les 30 s
+                            IconButton(
+                              tooltip: 'Actualiser',
+                              onPressed: () => app.refreshLineAll(j.line.id),
+                              icon: const Icon(Icons.refresh),
+                            ),
+                            IconButton(
+                              tooltip: 'Fermer',
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(Icons.cancel_outlined),
+                            ),
+                          ],
+                        ),
+                        Text('À votre arrêt : ${eta(times[j.from])}', style: small),
+                        Text(
+                          'À ${j.variant.stops[j.to].name} : ${eta(times[j.to])}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: small,
+                        ),
+                        Text(
+                          source,
+                          style: small?.copyWith(color: sourceColor, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: LineMap(
-                    showMe: app.showMyPosition || _located,
-                    vehicleIcon: vehicleIcon(j.line.type),
-                    confirmationColors: true,
-                    shapes: [j.variant.shape],
-                    stops: j.variant.stops,
-                    color: j.line.color,
-                    myStop: j.variant.stops[j.from],
-                    toStop: j.variant.stops[j.to],
-                    buses: bus,
+                  Expanded(
+                    child: LineMap(
+                      showMe: app.showMyPosition || _located,
+                      vehicleIcon: vehicleIcon(j.line.type),
+                      confirmationColors: true,
+                      shapes: [j.variant.shape],
+                      stops: j.variant.stops,
+                      color: j.line.color,
+                      myStop: j.variant.stops[j.from],
+                      toStop: j.variant.stops[j.to],
+                      buses: bus,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
-        },
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
+}
+
+/// Reconstruit son contenu chaque seconde (panneau ouvert par-dessus l'écran).
+class _Ticking extends StatefulWidget {
+  const _Ticking({required this.builder});
+  final WidgetBuilder builder;
+
+  @override
+  State<_Ticking> createState() => _TickingState();
+}
+
+class _TickingState extends State<_Ticking> {
+  late final Timer _timer = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+
+  @override
+  void initState() {
+    super.initState();
+    _timer;
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context);
 }
