@@ -11,6 +11,7 @@ import '../data/realtime.dart';
 import '../poc/app_state.dart';
 import '../poc/data.dart';
 import '../poc/line_vehicles.dart';
+import '../poc/nearby.dart';
 import '../poc/position.dart';
 import '../poc/ride_control.dart';
 import '../widgets/line_badge.dart';
@@ -74,6 +75,8 @@ class _LineScreenState extends State<LineScreen> {
       }
     }
     if (widget.lineId != null && app.hasSchedules(widget.lineId!)) _openAt(widget.lineId!);
+    // localisation déjà autorisée : l'arrêt le plus proche de la ligne, s'il est à moins de 500 m
+    if (widget.lineId == null && app.showMyPosition) _nearestStop(auto: true);
     if (_lineId != null) app.loadTraffic(_lineId!);
     _scrollToNextSoon();
     // les bus avancent entre deux requêtes : on redessine chaque seconde
@@ -100,6 +103,25 @@ class _LineScreenState extends State<LineScreen> {
       }
     }
     _stop = _stops.first.name;
+  }
+
+  /// Arrêt le plus proche dans le sens choisi. [auto] (ouverture) : sans demander la permission, et
+  /// seulement à moins de 500 m ; sinon (bouton 📍) : le plus proche, à toute distance.
+  Future<void> _nearestStop({required bool auto}) async {
+    final lineId = _lineId, dir = _dir;
+    final me = await currentPosition(ask: !auto);
+    if (!mounted || !_usable || _lineId != lineId || _dir != dir) return;
+    void tell(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+    if (me == null) {
+      if (!auto) tell('Position indisponible : localisation désactivée ou refusée.');
+      return;
+    }
+    final found = nearestStop(_stops, me);
+    if (found == null) return;
+    final (stop, d) = found;
+    if (auto && d > autoStopRadius) return;
+    if (stop.name != _stop) _select(stop: stop.name);
+    tell('Arrêt le plus proche : ${stop.name} (${distanceLabel(d)})');
   }
 
   void _scrollToNextSoon() => WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -330,6 +352,11 @@ class _LineScreenState extends State<LineScreen> {
                     ],
                     onChanged: (v) => _select(stop: v),
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Arrêt le plus proche',
+                  onPressed: () => _nearestStop(auto: false),
+                  icon: const Icon(Icons.near_me_outlined),
                 ),
               ],
             ),

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../data/realtime.dart';
 import '../poc/app_state.dart';
 import '../poc/data.dart';
+import '../poc/nearby.dart';
 import '../poc/position.dart';
 import '../widgets/line_badge.dart';
 import '../widgets/line_map.dart';
@@ -114,10 +115,100 @@ class _TripScreenState extends State<TripScreen> {
     return out..sort((a, b) => dep(a).compareTo(dep(b)));
   }
 
+  /// Arrêts à proximité (zone, distance) ; null tant que la position n'est pas connue.
+  List<(StopArea, double)>? _nearby;
+  bool _locating = false;
+  String? _nearbyError;
+
   @override
   void initState() {
     super.initState();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+    // localisation déjà autorisée (« Ma position sur la carte ») : arrêts proches tout de suite
+    if (app.showMyPosition) _locate(ask: false);
+  }
+
+  /// Cherche les arrêts à proximité ; [ask] : demande la permission (appui de l'usager).
+  Future<void> _locate({required bool ask}) async {
+    setState(() {
+      _locating = true;
+      _nearbyError = null;
+    });
+    final me = await currentPosition(ask: ask);
+    if (!mounted) return;
+    setState(() {
+      _locating = false;
+      if (me == null) {
+        if (ask) _nearbyError = 'Position indisponible : localisation désactivée ou refusée.';
+      } else {
+        _nearby = nearbyAreas(_boardingAreas, me);
+      }
+    });
+  }
+
+  /// Choisit une zone comme arrêt de départ (depuis la liste des arrêts proches).
+  void _pickOrigin(StopArea a) => setState(() {
+    _origin = a;
+    if (!_destinations.contains(_destination)) _destination = null;
+    _fieldsKey = UniqueKey(); // recrée les champs avec la nouvelle valeur
+  });
+
+  /// Arrêts près de moi : dans l'espace libre tant que l'arrêt de départ n'est pas choisi.
+  Widget _nearbyList(BuildContext context) {
+    final theme = Theme.of(context);
+    final list = _nearby;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text('Arrêts près de moi', style: theme.textTheme.titleMedium)),
+            if (_locating)
+              const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+            else
+              TextButton.icon(
+                onPressed: () => _locate(ask: true),
+                icon: const Icon(Icons.my_location),
+                label: Text(list == null ? 'Me localiser' : 'Actualiser'),
+              ),
+          ],
+        ),
+        if (_nearbyError != null)
+          Text(_nearbyError!, style: TextStyle(color: theme.colorScheme.error))
+        else if (list == null && !_locating)
+          const Text('Touchez « Me localiser » pour voir les arrêts autour de vous.')
+        else if (list != null && list.isEmpty)
+          Text('Aucun arrêt à moins de ${distanceLabel(nearbyRadius)}.'),
+        for (final (a, d) in list ?? const <(StopArea, double)>[])
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.place_outlined),
+            title: Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text('${distanceLabel(d)}${a.town.isEmpty ? '' : ' · ${a.town}'}'),
+                  for (final id in a.lines.take(8))
+                    if (app.line(id) case final l?)
+                      LineBadge(name: l.name, color: l.color, textColor: l.textColor, small: true),
+                  if (a.lines.length > 8) Text('+${a.lines.length - 8}'),
+                ],
+              ),
+            ),
+            onTap: () => _pickOrigin(a),
+          ),
+        const SizedBox(height: 16),
+        Text(
+          "Seuls les trajets directs (sans correspondance) sont proposés.",
+          style: theme.textTheme.bodySmall,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
   }
 
   @override
@@ -337,6 +428,7 @@ class _TripScreenState extends State<TripScreen> {
   }
 
   Widget _results(BuildContext context, bool ready, bool nothingDownloaded, List<_Journey> journeys, int now) {
+    if (_origin == null) return _nearbyList(context);
     String? message;
     if (!ready) {
       message =

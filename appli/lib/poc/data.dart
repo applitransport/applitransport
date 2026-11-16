@@ -174,9 +174,13 @@ class StopArea {
       name = j['name'],
       town = j['town'] ?? '',
       aliases = List<String>.from(j['aliases'] ?? const []),
-      lines = [for (final r in j['lines']) lineCode(r)];
+      lines = [for (final r in j['lines']) lineCode(r)],
+      pos = LatLng((j['lat'] as num?)?.toDouble() ?? 0, (j['lon'] as num?)?.toDouble() ?? 0);
 
   final String id, name;
+
+  /// Position de la zone d'arrêt (catalogue) : arrêts à proximité.
+  final LatLng pos;
 
   /// Commune (référentiel des arrêts IDFM) : distingue les homonymes (« Le Hameau »).
   final String town;
