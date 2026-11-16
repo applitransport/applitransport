@@ -83,6 +83,28 @@ List<StopArea> searchStopAreas(Iterable<StopArea> areas, String query, {int limi
   return hits.take(limit).toList();
 }
 
+/// Nom de quai par lequel [a] répond à [query], quand le nom de la zone n'y répond pas
+/// (« souterrain quai k » → « Saint-Quentin - Souterrain quai K » dans la zone « Saint-Quentin en
+/// Yvelines - Montigny-le-Bretonneux ») : affiché à côté du nom, sinon on ne reconnaît pas l'arrêt.
+String? matchedQuay(StopArea a, String query) {
+  final q = searchKey(query);
+  if (q.isEmpty) return null;
+  final words = q.split(' ');
+  final zone = a.nameKeys.first;
+  if (zone.contains(q) || words.every((w) => zone.contains(w) || a.townKey.contains(w))) return null;
+  final names = [a.name, ...a.aliases];
+  for (var i = 1; i < names.length; i++) {
+    if (a.nameKeys[i].contains(q)) return names[i];
+  }
+  // sinon, le quai qui contient le plus de mots de la saisie
+  var best = -1, count = 0;
+  for (var i = 1; i < names.length; i++) {
+    final n = words.where((w) => a.nameKeys[i].contains(w)).length;
+    if (n > count) (best, count) = (i, n);
+  }
+  return best < 0 ? null : names[best];
+}
+
 /// IDFM:C01527 -> C01527
 String lineCode(String routeId) => routeId.split(':').last;
 

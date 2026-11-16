@@ -356,7 +356,7 @@ class _LineScreenState extends State<LineScreen> {
                 IconButton(
                   tooltip: 'Arrêt le plus proche',
                   onPressed: () => _nearestStop(auto: false),
-                  icon: const Icon(Icons.near_me_outlined),
+                  icon: const Icon(Icons.my_location),
                 ),
               ],
             ),

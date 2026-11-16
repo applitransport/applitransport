@@ -36,4 +36,17 @@ void main() {
     expect(find('souterrain'), ['Saint-Quentin en Yvelines - Montigny-le-Bretonneux']); // nom de quai
     expect(find('hameau montigny'), ['Le Hameau']); // nom + commune
   });
+
+  test('nom de quai affiché quand seul lui répond à la saisie', () {
+    final gare = area(
+      'Saint-Quentin en Yvelines - Montigny-le-Bretonneux',
+      aliases: ['Saint-Quentin - Gare P. Delouvrier P', 'Saint-Quentin - Souterrain quai K'],
+      town: 'Montigny-le-Bretonneux',
+    );
+    expect(matchedQuay(gare, 'souterrain quai k'), 'Saint-Quentin - Souterrain quai K');
+    expect(matchedQuay(gare, 'gare de saint quentin'), 'Saint-Quentin - Gare P. Delouvrier P');
+    expect(matchedQuay(gare, 'saint quentin en yvelines'), isNull); // le nom de la zone suffit
+    expect(matchedQuay(gare, 'montigny'), isNull);
+    expect(matchedQuay(gare, ''), isNull);
+  });
 }

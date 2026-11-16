@@ -1,4 +1,4 @@
-// Cas 2 : arrêt de départ → arrêt d'arrivée. Prochains bus directs de toutes les lignes qui relient
+// Cas 2, « Quelle ligne prendre ? » : arrêt de départ → arrêt d'arrivée. Prochains bus directs de toutes les lignes qui relient
 // les deux zones d'arrêt ; celles qui ne sont pas téléchargées sont proposées au téléchargement.
 // Actualiser / Auto : une requête PRIM « arrêt » corrige les horaires au départ.
 import 'dart:async';
@@ -14,6 +14,7 @@ import '../widgets/line_badge.dart';
 import '../widgets/line_map.dart';
 import '../widgets/refresh_controls.dart';
 import '../widgets/traffic_button.dart';
+import 'itinerary_screen.dart';
 
 const _horizonSec = 2 * 3600; // prochains départs seulement
 
@@ -115,6 +116,10 @@ class _TripScreenState extends State<TripScreen> {
     return out..sort((a, b) => dep(a).compareTo(dep(b)));
   }
 
+  /// Dernière saisie de chaque champ (« départ », « arrivée ») : nom de quai trouvé, destination sans
+  /// ligne directe.
+  final Map<String, String> _queries = {};
+
   /// Arrêts à proximité (zone, distance) ; null tant que la position n'est pas connue.
   List<(StopArea, double)>? _nearby;
   bool _locating = false;
@@ -152,6 +157,39 @@ class _TripScreenState extends State<TripScreen> {
     if (!_destinations.contains(_destination)) _destination = null;
     _fieldsKey = UniqueKey(); // recrée les champs avec la nouvelle valeur
   });
+
+  /// Pas de ligne directe vers [to] : Itinéraire, prérempli avec les deux arrêts.
+  Widget _noDirect(BuildContext context, StopArea to) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Pas de ligne directe de ${_origin!.label} à ${to.label}.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          const Text('Avec un changement, Itinéraire trouve le trajet (internet).', textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () {
+              PlaceChoice place(StopArea a) =>
+                  PlaceChoice(a.label, a.town.isEmpty ? 'Arrêt' : a.town, 'stop_area:${a.id}', 'arret');
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ItineraryScreen(app: app, from: place(_origin!), to: place(to)),
+                ),
+              );
+            },
+            icon: const Icon(Icons.directions),
+            label: const Text('Chercher avec Itinéraire'),
+          ),
+        ],
+      ),
+    ),
+  );
 
   /// Arrêts près de moi : dans l'espace libre tant que l'arrêt de départ n'est pas choisi.
   Widget _nearbyList(BuildContext context) {
@@ -237,7 +275,7 @@ class _TripScreenState extends State<TripScreen> {
             .whereType<DateTime>()
             .fold<DateTime?>(null, (a, b) => a == null || b.isBefore(a) ? b : a);
         return Scaffold(
-          appBar: AppBar(title: const Text('Arrêt → destination')),
+          appBar: AppBar(title: const Text('Quelle ligne prendre ?')),
           body: Column(
             children: [
               _fields(context),
@@ -274,6 +312,13 @@ class _TripScreenState extends State<TripScreen> {
       initialValue: TextEditingValue(text: value?.label ?? ''),
       displayStringForOption: (a) => a.label,
       optionsBuilder: (v) {
+        if (_queries[label] != v.text) {
+          _queries[label] = v.text;
+          // la destination sans ligne directe s'affiche sous les champs : on redessine après la saisie
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() {});
+          });
+        }
         return searchStopAreas(options, v.text);
       },
       optionsViewBuilder: (context, onSelected, options) => Align(
@@ -289,7 +334,19 @@ class _TripScreenState extends State<TripScreen> {
                 for (final a in options)
                   ListTile(
                     dense: true,
-                    title: Text(a.label),
+                    // trouvé par un nom de quai : affiché, sinon on ne reconnaît pas l'arrêt
+                    title: Text.rich(
+                      TextSpan(
+                        text: a.label,
+                        children: [
+                          if (matchedQuay(a, _queries[label] ?? '') case final quay?)
+                            TextSpan(
+                              text: ' · $quay',
+                              style: const TextStyle(fontStyle: FontStyle.italic),
+                            ),
+                        ],
+                      ),
+                    ),
                     // plusieurs zones portent le même nom (« Le Hameau ») : le réseau aide à choisir
                     subtitle: Text(
                       [
@@ -354,6 +411,12 @@ class _TripScreenState extends State<TripScreen> {
                   _destinations,
                   _destination,
                   (v) => setState(() => _destination = v),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Toutes les lignes directes entre deux arrêts et leurs prochains départs, sans connexion. '
+                  'Avec un changement : Itinéraire.',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
@@ -429,11 +492,21 @@ class _TripScreenState extends State<TripScreen> {
 
   Widget _results(BuildContext context, bool ready, bool nothingDownloaded, List<_Journey> journeys, int now) {
     if (_origin == null) return _nearbyList(context);
+    if (_destination == null) {
+      // destination tapée qui n'est atteignable qu'avec un changement : proposer Itinéraire
+      final q = _queries["Arrêt d'arrivée"] ?? '';
+      if (searchKey(q).length >= 2 && searchStopAreas(_destinations, q).isEmpty) {
+        final elsewhere = searchStopAreas(_boardingAreas, q, limit: 1).firstOrNull;
+        if (elsewhere != null) return _noDirect(context, elsewhere);
+      }
+    }
     String? message;
     if (!ready) {
-      message =
-          "Choisissez un arrêt de départ puis un arrêt d'arrivée.\n"
-          'Seuls les trajets directs (sans correspondance) sont proposés.';
+      message = _origin == null
+          ? "Choisissez un arrêt de départ puis un arrêt d'arrivée.\n"
+                'Seuls les trajets directs (sans correspondance) sont proposés.'
+          : "Choisissez l'arrêt d'arrivée : seuls ceux desservis sans changement depuis ${_origin!.label} "
+                'sont proposés.';
     } else if (nothingDownloaded) {
       message = 'Aucune ligne téléchargée ne fait ce trajet.\nAjoutez celles proposées ci-dessus.';
     } else if (journeys.isEmpty) {

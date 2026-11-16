@@ -77,8 +77,11 @@ class _Timed {
 }
 
 class ItineraryScreen extends StatefulWidget {
-  const ItineraryScreen({super.key, required this.app});
+  const ItineraryScreen({super.key, required this.app, this.from, this.to});
   final AppState app;
+
+  /// Lieux préremplis (depuis « Quelle ligne prendre ? » quand il n'y a pas de ligne directe).
+  final PlaceChoice? from, to;
 
   @override
   State<ItineraryScreen> createState() => _ItineraryScreenState();
@@ -101,6 +104,8 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
   @override
   void initState() {
     super.initState();
+    _from = widget.from;
+    _to = widget.to;
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
   }
 

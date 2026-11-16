@@ -92,8 +92,8 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 12),
           useCase(
             Icons.alt_route,
-            'Arrêt → destination',
-            'Tous les trajets directs vers votre arrêt d\'arrivée.',
+            'Quelle ligne prendre ?',
+            'Toutes les lignes directes d\'un arrêt à un autre et leurs prochains départs, sans connexion.',
             TripScreen(app: app),
           ),
           const SizedBox(height: 12),
