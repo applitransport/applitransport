@@ -315,6 +315,32 @@ class AppState extends ChangeNotifier {
   // --- lignes préférées -------------------------------------------------------------
   List<String> get preferred => settings.preferred;
 
+  /// Les deux lignes de l'accueil : celles choisies (si toujours favorites et téléchargées), complétées
+  /// par les premières favorites.
+  List<String> get homeLines {
+    final fav = preferred.where(hasSchedules).toList();
+    final out = [
+      for (final id in settings.homeLines)
+        if (fav.contains(id)) id,
+    ];
+    for (final id in fav) {
+      if (out.length >= 2) break;
+      if (!out.contains(id)) out.add(id);
+    }
+    return out.take(2).toList();
+  }
+
+  /// Remplace la ligne [old] de l'accueil par [id].
+  void setHomeLine(String old, String id) {
+    final cur = homeLines;
+    final i = cur.indexOf(old);
+    if (i < 0) return;
+    cur[i] = id;
+    settings.homeLines = cur;
+    settings.save();
+    notifyListeners();
+  }
+
   /// Sens et arrêt retenus pour une ligne (null : jamais consultée).
   ({int dir, String stop})? lineStop(String lineId) {
     // ligne jamais mémorisée : la dernière sélection du suivi de ligne, si c'est elle

@@ -313,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // --- lignes favorites (les deux premières) ---------------------------------------------
   Widget _myLines(BuildContext context) {
     final all = app.preferred.where(app.hasSchedules).toList();
-    final lines = all.take(2).toList();
+    final lines = app.homeLines;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -408,7 +408,18 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Row(
                   children: [
-                    LineBadge(name: l.name, color: l.color, textColor: l.textColor),
+                    // toucher le numéro : choisir une autre ligne favorite à afficher ici
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => _chooseLine(context, id),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          LineBadge(name: l.name, color: l.color, textColor: l.textColor),
+                          Icon(Icons.arrow_drop_down, color: scheme.onSurfaceVariant),
+                        ],
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -460,6 +471,43 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Autres lignes favorites (hors celles déjà affichées) : celle choisie remplace [current].
+  Future<void> _chooseLine(BuildContext context, String current) async {
+    final shown = app.homeLines;
+    final others = app.preferred.where(app.hasSchedules).where((id) => !shown.contains(id)).toList();
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const ListTile(title: Text('Afficher une autre ligne favorite')),
+            if (others.isEmpty)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Text('Pas d\'autre ligne favorite. Ajoutez-en avec l\'étoile du Suivi de ligne.'),
+              ),
+            for (final id in others)
+              if (app.timetable(id) case final l?)
+                ListTile(
+                  leading: LineBadge(name: l.name, color: l.color, textColor: l.textColor),
+                  title: Text(
+                    app.lineStop(id)?.stop ?? app.line(id)?.longLabel ?? l.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () {
+                    app.setHomeLine(current, id);
+                    Navigator.pop(ctx);
+                  },
+                ),
+          ],
         ),
       ),
     );

@@ -47,6 +47,7 @@ class SettingsStore {
           for (final e in ((j['line_stops'] ?? const {}) as Map).entries)
             e.key as String: Map<String, dynamic>.from(e.value),
         };
+        s.homeLines = List<String>.from(j['home_lines'] ?? const []);
         s.recentTrips = [for (final f in (j['recent_trips'] ?? const []) as List) Map<String, dynamic>.from(f)];
       } on FormatException {
         // fichier abîmé : on repart des réglages par défaut
@@ -90,6 +91,9 @@ class SettingsStore {
   /// Dernier sens et arrêt consultés pour chaque ligne (« Mes lignes » de l'accueil) : {dir, stop}.
   Map<String, Map<String, dynamic>> lineStops = {};
 
+  /// Les deux lignes affichées sur l'accueil (choisies parmi les favorites).
+  List<String> homeLines = [];
+
   /// Recherches récentes (Itinéraire, 15 au plus, la plus récente d'abord) : {from, to, at}.
   List<Map<String, dynamic>> recentTrips = [];
 
@@ -114,6 +118,7 @@ class SettingsStore {
         'fav_trips': favTrips,
         'recent_trips': recentTrips,
         'line_stops': lineStops,
+        'home_lines': homeLines,
       }),
     );
     await tmp.rename(_file.path);

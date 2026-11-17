@@ -37,6 +37,9 @@ IconData modeIcon(String? mode) {
 }
 
 /// Lieu choisi : [ref] = identifiant pour le calculateur (null : ma position, résolue au moment de chercher).
+/// Accent des favoris (comme l'accueil).
+const _favAmber = Color(0xFFF2A541);
+
 class PlaceChoice {
   const PlaceChoice(this.label, this.detail, this.ref, this.kind, {this.near, this.favRole});
   final String label, detail;
@@ -218,7 +221,11 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
     return ListenableBuilder(
       listenable: app,
       builder: (context, _) => Scaffold(
-        appBar: AppBar(title: const Text('Itinéraire')),
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+        appBar: AppBar(
+          title: const Text('Itinéraire', style: TextStyle(fontWeight: FontWeight.w700)),
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+        ),
         body: SafeArea(
           top: false,
           child: Column(
@@ -249,88 +256,131 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
     );
   }
 
+  /// Carte blanche arrondie et ombrée (style de l'accueil).
+  BoxDecoration _cardDeco(BuildContext context, {double radius = 22}) => BoxDecoration(
+    color: Theme.of(context).colorScheme.surfaceContainerLowest,
+    borderRadius: BorderRadius.circular(radius),
+    boxShadow: const [
+      BoxShadow(color: Color(0x0F14212B), blurRadius: 2, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x1214212B), blurRadius: 18, offset: Offset(0, 6)),
+    ],
+  );
+
   Widget _form(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final time = _time ?? TimeOfDay.fromDateTime(app.now());
+    Future<void> pickWhen(int w) async {
+      if (w != 0) {
+        final t = await _pickTime(context, time, w == 2 ? 'Arriver à' : 'Partir à');
+        if (t == null) return;
+        _time = t;
+      }
+      setState(() => _when = w);
+    }
+
+    Widget whenChip(int w, String label) => Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(_when == w && w != 0 ? '$label ${time.format(context)}' : label),
+        selected: _when == w,
+        showCheckmark: false,
+        shape: const StadiumBorder(),
+        onSelected: (_) => pickWhen(w),
+      ),
+    );
     return Padding(
       key: _fieldsKey,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    _PlaceField(
-                      app: app,
-                      near: () => _quickPos(_to),
-                      label: 'Départ',
-                      icon: Icons.trip_origin,
-                      value: _from,
-                      onSet: (p) => setState(() {
-                        _from = p;
-                        _search = null; // lieu changé : l'aperçu remplace les anciens résultats
-                      }),
-                    ),
-                    const SizedBox(height: 8),
-                    _PlaceField(
-                      app: app,
-                      near: () => _quickPos(_from),
-                      label: 'Arrivée',
-                      icon: Icons.flag,
-                      value: _to,
-                      onSet: (p) => setState(() {
-                        _to = p;
-                        _search = null; // lieu changé : l'aperçu remplace les anciens résultats
-                      }),
-                      initialText: _to == null ? widget.toQuery : null,
-                    ),
-                  ],
+          // départ et arrivée dans une seule carte, reliés par un pointillé
+          Container(
+            decoration: _cardDeco(context),
+            padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: scheme.primary, width: 3),
+                        ),
+                      ),
+                      for (var i = 0; i < 6; i++)
+                        Container(
+                          width: 2,
+                          height: 4,
+                          margin: const EdgeInsets.symmetric(vertical: 2),
+                          color: scheme.outlineVariant,
+                        ),
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(color: _favAmber, borderRadius: BorderRadius.circular(3)),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                tooltip: 'Inverser',
-                icon: const Icon(Icons.swap_vert),
-                onPressed: () => setState(() {
-                  final f = _from;
-                  _from = _to;
-                  _to = f;
-                  _fieldsKey = UniqueKey();
-                }),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    children: [
+                      _PlaceField(
+                        app: app,
+                        near: () => _quickPos(_to),
+                        label: 'Départ',
+                        icon: Icons.trip_origin,
+                        value: _from,
+                        onSet: (p) => setState(() {
+                          _from = p;
+                          _search = null; // lieu changé : l'aperçu remplace les anciens résultats
+                        }),
+                      ),
+                      const SizedBox(height: 8),
+                      _PlaceField(
+                        app: app,
+                        near: () => _quickPos(_from),
+                        label: 'Arrivée',
+                        icon: Icons.flag,
+                        value: _to,
+                        onSet: (p) => setState(() {
+                          _to = p;
+                          _search = null; // lieu changé : l'aperçu remplace les anciens résultats
+                        }),
+                        initialText: _to == null ? widget.toQuery : null,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton.outlined(
+                  tooltip: 'Inverser départ et arrivée',
+                  icon: const Icon(Icons.swap_vert),
+                  onPressed: () => setState(() {
+                    final f = _from;
+                    _from = _to;
+                    _to = f;
+                    _fieldsKey = UniqueKey();
+                  }),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: SegmentedButton<int>(
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: 0, label: Text('Maintenant')),
-                    ButtonSegment(value: 1, label: Text('Partir à')),
-                    ButtonSegment(value: 2, label: Text('Arriver')),
-                  ],
-                  selected: {_when},
-                  onSelectionChanged: (s) async {
-                    final w = s.first;
-                    if (w != 0) {
-                      final t = await _pickTime(context, time, w == 2 ? 'Arriver à' : 'Partir à');
-                      if (t == null) return;
-                      _time = t;
-                    }
-                    setState(() => _when = w);
-                  },
-                ),
-              ),
-              if (_when != 0) Padding(padding: const EdgeInsets.only(left: 8), child: Text(time.format(context))),
-            ],
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [whenChip(0, 'Maintenant'), whenChip(1, 'Partir à'), whenChip(2, 'Arriver à')]),
           ),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: FilledButton.icon(
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                   onPressed: _searching ? null : _run,
                   icon: _searching
                       ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
@@ -344,7 +394,7 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
                   tooltip: _favTrip == null ? 'Ajouter aux trajets favoris' : 'Retirer des trajets favoris',
                   icon: Icon(
                     _favTrip == null ? Icons.star_border : Icons.star,
-                    color: _favTrip == null ? null : Colors.amber.shade700,
+                    color: _favTrip == null ? null : _favAmber,
                   ),
                   onPressed: () {
                     final f = _favTrip;
@@ -444,92 +494,131 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
         Flexible(child: Text(p.label, overflow: TextOverflow.ellipsis)),
       ],
     );
+    final scheme = Theme.of(context).colorScheme;
+    final section = t.titleMedium?.copyWith(fontWeight: FontWeight.w700);
+    final recent = [
+      for (final r in app.recentTrips)
+        if (!_isFavTrip(r)) r,
+    ];
+    final trips = app.favTrips.reversed.toList();
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       children: [
-        if (app.favTrips.isNotEmpty) ...[
-          Text('Trajets favoris', style: t.titleSmall),
-          const SizedBox(height: 4),
-          for (final trip in app.favTrips.reversed)
-            Card(
-              margin: const EdgeInsets.symmetric(vertical: 3),
-              child: ListTile(
-                dense: true,
-                title: Row(
-                  children: [
-                    Flexible(child: label(icon(trip['from'] as Map))),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6),
-                      child: Icon(Icons.arrow_forward, size: 16),
+        if (trips.isNotEmpty) ...[
+          Text('Trajets favoris', style: section),
+          const SizedBox(height: 8),
+          // en tuiles : la première aux couleurs de l'appli ; ⇅ pour le sens inverse, appui long pour retirer
+          SizedBox(
+            height: 92,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: trips.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, i) {
+                final trip = trips[i];
+                final first = i == 0;
+                final fg = first ? scheme.onPrimary : scheme.onSurface;
+                final a = icon(trip['from'] as Map), b = icon(trip['to'] as Map);
+                return SizedBox(
+                  width: 220,
+                  child: Material(
+                    color: first ? scheme.primary : scheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(18),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(18),
+                      onTap: () => _useTrip(trip),
+                      onLongPress: () => app.removeFavTrip(trip),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    a.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 15),
+                                  ),
+                                  Text(
+                                    '→ ${b.label}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: fg),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Sens inverse',
+                              color: fg,
+                              icon: const Icon(Icons.swap_vert),
+                              onPressed: () => _useTrip(trip, reverse: true),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    Flexible(child: label(icon(trip['to'] as Map))),
-                  ],
-                ),
-                onTap: () => _useTrip(trip),
-                onLongPress: () => app.removeFavTrip(trip),
-                trailing: IconButton(
-                  tooltip: 'Sens inverse',
-                  icon: const Icon(Icons.swap_vert),
-                  onPressed: () => _useTrip(trip, reverse: true),
-                ),
-              ),
+                  ),
+                );
+              },
             ),
-          Text('Appui long sur un trajet pour le retirer.', style: t.bodySmall),
-          const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 18),
         ],
         // recherches récentes (hors trajets favoris), les 3 dernières puis toutes sur demande
-        if ([
-              for (final r in app.recentTrips)
-                if (!_isFavTrip(r)) r,
-            ]
-            case final recent when recent.isNotEmpty) ...[
+        if (recent.isNotEmpty) ...[
           Row(
             children: [
-              Expanded(child: Text('Recherches récentes', style: t.titleSmall)),
+              Expanded(child: Text('Recherches récentes', style: section)),
               TextButton(onPressed: app.clearRecentTrips, child: const Text('Tout effacer')),
             ],
           ),
-          for (final r in _allRecent ? recent : recent.take(3))
-            ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.history),
-              title: Row(
-                children: [
-                  Flexible(child: label(icon(r['from'] as Map))),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6),
-                    child: Icon(Icons.arrow_forward, size: 16),
+          Container(
+            decoration: _cardDeco(context, radius: 18),
+            child: Column(
+              children: [
+                for (final r in _allRecent ? recent : recent.take(3))
+                  ListTile(
+                    leading: Icon(Icons.history, color: scheme.onSurfaceVariant),
+                    title: Row(
+                      children: [
+                        Flexible(child: label(icon(r['from'] as Map))),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 6),
+                          child: Icon(Icons.arrow_forward, size: 16),
+                        ),
+                        Flexible(child: label(icon(r['to'] as Map))),
+                      ],
+                    ),
+                    subtitle: Text(_ago(r['at'] as String?)),
+                    onTap: () => _useTrip(r),
+                    onLongPress: () => app.removeRecentTrip(r),
+                    trailing: IconButton(
+                      tooltip: 'Ajouter aux trajets favoris',
+                      icon: const Icon(Icons.star_border),
+                      onPressed: () => app.saveFavTrip(
+                        Map<String, dynamic>.from(r['from'] as Map),
+                        Map<String, dynamic>.from(r['to'] as Map),
+                      ),
+                    ),
                   ),
-                  Flexible(child: label(icon(r['to'] as Map))),
-                ],
-              ),
-              subtitle: Text(_ago(r['at'] as String?)),
-              onTap: () => _useTrip(r),
-              onLongPress: () => app.removeRecentTrip(r),
-              trailing: IconButton(
-                tooltip: 'Ajouter aux trajets favoris',
-                icon: const Icon(Icons.star_border),
-                onPressed: () => app.saveFavTrip(
-                  Map<String, dynamic>.from(r['from'] as Map),
-                  Map<String, dynamic>.from(r['to'] as Map),
-                ),
-              ),
+                if (recent.length > 3)
+                  TextButton(
+                    onPressed: () => setState(() => _allRecent = !_allRecent),
+                    child: Text(_allRecent ? 'Voir moins' : 'Voir les ${recent.length}'),
+                  ),
+              ],
             ),
-          if (recent.length > 3)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: () => setState(() => _allRecent = !_allRecent),
-                child: Text(_allRecent ? 'Voir moins' : 'Voir les ${recent.length}'),
-              ),
-            ),
-          Text('Appui long sur une recherche pour la retirer.', style: t.bodySmall),
-          const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 18),
         ],
         Row(
           children: [
-            Expanded(child: Text('Arrêts près de moi', style: t.titleSmall)),
+            Expanded(child: Text('Arrêts près de moi', style: section)),
             TextButton.icon(
               onPressed: _locating ? null : _locate,
               icon: _locating
@@ -540,30 +629,60 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
           ],
         ),
         if (_nearbyError != null)
-          Text(_nearbyError!, style: TextStyle(color: Theme.of(context).colorScheme.error))
+          Text(_nearbyError!, style: TextStyle(color: scheme.error))
         else if (nearby == null)
           const Text('Touchez « Me localiser » pour voir les arrêts autour de vous.')
         else if (nearby.isEmpty)
           const Text('Aucun arrêt à moins de 800 m.')
         else
-          for (final (a, d) in nearby)
-            ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.directions_bus_outlined),
-              title: Text(a.label),
-              subtitle: Text('${distanceLabel(d)} · ${a.town}'),
-              onTap: () => setState(() {
-                _from = PlaceChoice(a.label, a.town.isEmpty ? 'Arrêt' : a.town, 'stop_area:${a.id}', 'arret');
-                _search = null;
-                _fieldsKey = UniqueKey();
-              }),
+          // vignettes : toucher un arrêt le met en départ
+          SizedBox(
+            height: 70,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: nearby.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, i) {
+                final (a, d) = nearby[i];
+                return Container(
+                  width: 150,
+                  decoration: _cardDeco(context, radius: 16),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => setState(() {
+                        _from = PlaceChoice(a.label, a.town.isEmpty ? 'Arrêt' : a.town, 'stop_area:${a.id}', 'arret');
+                        _search = null;
+                        _fieldsKey = UniqueKey();
+                      }),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              a.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            Text(distanceLabel(d), style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
-        const SizedBox(height: 16),
+          ),
+        const SizedBox(height: 20),
         Text(
           'Itinéraires porte à porte, avec correspondances, calculés par Île-de-France Mobilités. '
-          'Nécessite internet et le jeton PRIM.',
-          style: t.bodySmall,
+          'Nécessite internet et le jeton PRIM. Appui long sur un trajet ou une recherche pour le retirer.',
+          style: t.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           textAlign: TextAlign.center,
         ),
       ],
@@ -1009,7 +1128,10 @@ class _PlaceFieldState extends State<_PlaceField> {
           // lieu ou adresse choisi : l'arrêt le plus proche
           helperText: value?.near,
           helperMaxLines: 2,
-          prefixIcon: Icon(icon),
+          // fond gris, sans cadre (la carte et le pointillé font le lien)
+          filled: true,
+          fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           // lieu choisi : étoile pour l'enregistrer en favori (pas « ma position », qui change)
           suffixIcon: value == null || value!.kind == 'position'
               ? null
@@ -1019,7 +1141,7 @@ class _PlaceFieldState extends State<_PlaceField> {
                   onPressed: () => _favSheet(context),
                 ),
           isDense: true,
-          border: const OutlineInputBorder(),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
         ),
       );
     },
