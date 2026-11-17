@@ -324,18 +324,174 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _searching ? null : _run,
-              icon: _searching
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.search),
-              label: const Text('Rechercher'),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _searching ? null : _run,
+                  icon: _searching
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.search),
+                  label: const Text('Rechercher'),
+                ),
+              ),
+              // trajet favori : départ et arrivée choisis
+              if (_from != null && _to != null)
+                IconButton(
+                  tooltip: _favTrip == null ? 'Ajouter aux trajets favoris' : 'Retirer des trajets favoris',
+                  icon: Icon(
+                    _favTrip == null ? Icons.star_border : Icons.star,
+                    color: _favTrip == null ? null : Colors.amber.shade700,
+                  ),
+                  onPressed: () {
+                    final f = _favTrip;
+                    if (f != null) {
+                      app.removeFavTrip(f);
+                    } else {
+                      app.saveFavTrip(_from!.toJson(), _to!.toJson());
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(const SnackBar(content: Text('Trajet ajouté aux favoris (3 au plus)')));
+                    }
+                  },
+                ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  // --- trajets favoris et arrêts proches (page vide) ----------------------------------
+  static bool _same(Map a, PlaceChoice? b) => b != null && a['ref'] == b.ref && a['kind'] == b.kind;
+
+  Map<String, dynamic>? get _favTrip =>
+      app.favTrips.where((t) => _same(t['from'] as Map, _from) && _same(t['to'] as Map, _to)).firstOrNull;
+
+  /// Nom affiché d'un lieu d'un trajet favori : son nom de favori s'il en a un (« Domicile »).
+  PlaceChoice _favOrPlace(Map p) {
+    final f = app.favPlaces.where((f) => (f['place'] as Map)['ref'] == p['ref'] && p['ref'] != null).firstOrNull;
+    return f != null ? PlaceChoice.fromFav(f) : PlaceChoice.fromJson(p);
+  }
+
+  void _useTrip(Map<String, dynamic> t, {bool reverse = false}) {
+    final a = _favOrPlace(t['from'] as Map), b = _favOrPlace(t['to'] as Map);
+    setState(() {
+      _from = reverse ? b : a;
+      _to = reverse ? a : b;
+      _search = null;
+      _fieldsKey = UniqueKey(); // recrée les champs avec les nouvelles valeurs
+    });
+  }
+
+  List<(StopArea, double)>? _nearby;
+  bool _locating = false;
+  String? _nearbyError;
+
+  Future<void> _locate() async {
+    setState(() {
+      _locating = true;
+      _nearbyError = null;
+    });
+    final me = await currentPosition(ask: true);
+    if (!mounted) return;
+    setState(() {
+      _locating = false;
+      if (me == null) {
+        _nearbyError = 'Position introuvable : localisation désactivée ou refusée, ou pas de signal GPS.';
+      } else {
+        _lastKnown = me;
+        _nearby = nearbyAreas(app.stopAreas.values, me);
+      }
+    });
+  }
+
+  /// Page vide : trajets favoris, puis arrêts près de moi (toucher un arrêt le met en départ).
+  Widget _home(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final nearby = _nearby;
+    PlaceChoice icon(Map p) => _favOrPlace(p);
+    Widget label(PlaceChoice p) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (p.favRole != null) Icon(_PlaceFieldState.favIcon(p.favRole), size: 16, color: Colors.amber.shade700),
+        const SizedBox(width: 2),
+        Flexible(child: Text(p.label, overflow: TextOverflow.ellipsis)),
+      ],
+    );
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      children: [
+        if (app.favTrips.isNotEmpty) ...[
+          Text('Trajets favoris', style: t.titleSmall),
+          const SizedBox(height: 4),
+          for (final trip in app.favTrips.reversed)
+            Card(
+              margin: const EdgeInsets.symmetric(vertical: 3),
+              child: ListTile(
+                dense: true,
+                title: Row(
+                  children: [
+                    Flexible(child: label(icon(trip['from'] as Map))),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6),
+                      child: Icon(Icons.arrow_forward, size: 16),
+                    ),
+                    Flexible(child: label(icon(trip['to'] as Map))),
+                  ],
+                ),
+                onTap: () => _useTrip(trip),
+                onLongPress: () => app.removeFavTrip(trip),
+                trailing: IconButton(
+                  tooltip: 'Sens inverse',
+                  icon: const Icon(Icons.swap_vert),
+                  onPressed: () => _useTrip(trip, reverse: true),
+                ),
+              ),
+            ),
+          Text('Appui long sur un trajet pour le retirer.', style: t.bodySmall),
+          const SizedBox(height: 12),
+        ],
+        Row(
+          children: [
+            Expanded(child: Text('Arrêts près de moi', style: t.titleSmall)),
+            TextButton.icon(
+              onPressed: _locating ? null : _locate,
+              icon: _locating
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.my_location),
+              label: Text(nearby == null ? 'Me localiser' : 'Actualiser'),
+            ),
+          ],
+        ),
+        if (_nearbyError != null)
+          Text(_nearbyError!, style: TextStyle(color: Theme.of(context).colorScheme.error))
+        else if (nearby == null)
+          const Text('Touchez « Me localiser » pour voir les arrêts autour de vous.')
+        else if (nearby.isEmpty)
+          const Text('Aucun arrêt à moins de 800 m.')
+        else
+          for (final (a, d) in nearby)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.directions_bus_outlined),
+              title: Text(a.label),
+              subtitle: Text('${distanceLabel(d)} · ${a.town}'),
+              onTap: () => setState(() {
+                _from = PlaceChoice(a.label, a.town.isEmpty ? 'Arrêt' : a.town, 'stop_area:${a.id}', 'arret');
+                _search = null;
+                _fieldsKey = UniqueKey();
+              }),
+            ),
+        const SizedBox(height: 16),
+        Text(
+          'Itinéraires porte à porte, avec correspondances, calculés par Île-de-France Mobilités. '
+          'Nécessite internet et le jeton PRIM.',
+          style: t.bodySmall,
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 
@@ -382,7 +538,7 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
             ? a
             : _to!.kind == 'position'
             ? b
-            : (app.showMyPosition ? await currentPosition() : null);
+            : (app.showMyPosition ? _lastKnown : null); // dernière position connue : pas d'attente du GPS
         return (a, b, me);
       }();
     }
@@ -405,18 +561,7 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
   Widget _results(BuildContext context) {
     final s = _search;
     if (s == null && _from != null && _to != null) return _preview();
-    if (s == null) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'Itinéraires porte à porte, avec correspondances, calculés par Île-de-France Mobilités.\n'
-            'Nécessite internet et le jeton PRIM.',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
+    if (s == null) return _home(context);
     final now = app.nowSec();
     return ValueListenableBuilder(
       valueListenable: _realtime,
