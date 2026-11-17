@@ -97,14 +97,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.15"
-  executor_lib:
-    dependency: transitive
-    description:
-      name: executor_lib
-      sha256: "95ddf2957d9942d9702855b38dd49677f0ee6a8b77d7b16c0e509c7669d17386"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.2"
   fake_async:
     dependency: transitive
     description:
@@ -142,14 +134,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_compass:
-    dependency: "direct main"
-    description:
-      name: flutter_compass
-      sha256: "1b4d7e6c95a675ec8482b5c9c9ccf1ebf0ced3dbec59dce28ad609da953de850"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.8.1"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -264,14 +248,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.2"
-  idb_shim:
+  image:
     dependency: transitive
     description:
-      name: idb_shim
-      sha256: "507d8f3154fa4e41165941c5aa8509c6bf155bb30f76ba25a00d1e7ba1dd64c9"
+      name: image
+      sha256: bc13f61f0f5cb77936e78ae5dae3800f442718dac5d2bc4654f03c239230ed0c
       url: "https://pub.dev"
     source: hosted
-    version: "2.11.3"
+    version: "4.13.1"
   intl:
     dependency: transitive
     description:
@@ -344,6 +328,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.1.0"
+  maplibre_gl:
+    dependency: "direct main"
+    description:
+      name: maplibre_gl
+      sha256: ea889b39d406344ea5794155223e67d96f42480f68a541c5e7851ee0235c686c
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.28.0"
+  maplibre_gl_platform_interface:
+    dependency: transitive
+    description:
+      name: maplibre_gl_platform_interface
+      sha256: "34083d4df59b1ae906269cc07795e3015ae7cb7e953393dfc6265f38a15f74f2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.28.0"
+  maplibre_gl_web:
+    dependency: transitive
+    description:
+      name: maplibre_gl_web
+      sha256: "42c3b77567faab6221528b71816cf0aa082ee1f431cb1a1b06df8baa9c518f67"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.28.0"
   matcher:
     dependency: transitive
     description:
@@ -496,22 +504,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
-  protobuf:
-    dependency: transitive
-    description:
-      name: protobuf
-      sha256: "68645b24e0716782e58948f8467fd42a880f255096a821f9e7d0ec625b00c84d"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.0"
-  sembast:
-    dependency: transitive
-    description:
-      name: sembast
-      sha256: "4f71f8c95105918fa207065429c913f38d0fb05fec9f3a745bbf4c113f5d482b"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.10.1"
   simple_sparse_list:
     dependency: transitive
     description:
@@ -557,14 +549,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
-  synchronized:
-    dependency: transitive
-    description:
-      name: synchronized
-      sha256: a77637ebe1460f3b48cac89a790d2eb634f0a8593cab0d3f340c6db174ba9b94
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.6.1+1"
   term_glyph:
     dependency: transitive
     description:
@@ -669,14 +653,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.6.0"
-  vector_map_tiles:
-    dependency: "direct main"
-    description:
-      name: vector_map_tiles
-      sha256: "42dce00e0f69352663f4c9c78fe5cc900704f6dd46019640ebda0d84cc14ce68"
-      url: "https://pub.dev"
-    source: hosted
-    version: "9.0.0-beta.13"
   vector_math:
     dependency: transitive
     description:
@@ -685,22 +661,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
-  vector_tile:
-    dependency: transitive
-    description:
-      name: vector_tile
-      sha256: "7ae290246e3a8734422672dbe791d3f7b8ab631734489fc6d405f1cc2080e38c"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.1"
-  vector_tile_renderer:
-    dependency: "direct main"
-    description:
-      name: vector_tile_renderer
-      sha256: "982ae5d8f0ab285463a4cd62e711c8f9a36b9b3112b5a471ae8d4f4838f31537"
-      url: "https://pub.dev"
-    source: hosted
-    version: "6.1.0"
   vm_service:
     dependency: transitive
     description:
