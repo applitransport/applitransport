@@ -8,6 +8,7 @@ import '../data/prim.dart';
 import '../data/settings_store.dart' show primHelpUrl;
 import '../poc/app_state.dart';
 import '../poc/data.dart';
+import '../widgets/card_decoration.dart';
 import '../widgets/line_badge.dart';
 import '../widgets/locked_field.dart';
 import '../widgets/ride_widgets.dart';
@@ -26,8 +27,10 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) => DefaultTabController(
     length: 3,
     child: Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       appBar: AppBar(
-        title: const Text('Configuration'),
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+        title: const Text('Configuration', style: TextStyle(fontWeight: FontWeight.w700)),
         bottom: const TabBar(
           tabs: [
             Tab(icon: Icon(Icons.route), text: 'Lignes'),
@@ -172,10 +175,12 @@ class _LinesTabState extends State<_LinesTab> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: TextField(
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search),
               hintText: 'Numéro, nom de ligne ou arrêt (ex. « Trappes Gare »)',
-              border: OutlineInputBorder(),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
               isDense: true,
             ),
             onChanged: (v) => setState(() => _query = v),
@@ -397,7 +402,7 @@ class _TokenTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(16),
-    children: [
+    children: cardSections(context, [
       const Text(
         'Le temps réel demande un jeton PRIM gratuit, propre à chaque appareil (compte sur le site '
         'd\'Île-de-France Mobilités). Il reste enregistré sur l\'appareil uniquement.',
@@ -412,8 +417,11 @@ class _TokenTab extends StatelessWidget {
       ),
       const SizedBox(height: 16),
       LockedField(label: 'Jeton PRIM', value: app.token, onSave: (v) async => app.setToken(v), onTest: app.testToken),
-      const SizedBox(height: 24),
-      Text('Requêtes PRIM aujourd\'hui depuis cet appareil', style: Theme.of(context).textTheme.titleSmall),
+      const Divider(),
+      Text(
+        'Requêtes PRIM aujourd\'hui depuis cet appareil',
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+      ),
       const Text('(la page de votre compte PRIM fait foi : elle compte aussi les autres usages du jeton)'),
       const SizedBox(height: 8),
       for (final e in app.requests.entries) ...[
@@ -422,7 +430,7 @@ class _TokenTab extends StatelessWidget {
         LinearProgressIndicator(value: e.value / primQuota[e.key]!),
         const SizedBox(height: 12),
       ],
-    ],
+    ]),
   );
 }
 
@@ -440,7 +448,10 @@ class _GeneralTab extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Lieux d\'Île-de-France', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'Lieux d\'Île-de-France',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const Text(
           'Commerces, restaurants, santé, culture, loisirs… (OpenStreetMap) pour chercher une destination dans '
           'Itinéraire, sans connexion et sans rien envoyer. Mis à jour chaque semaine.',
@@ -482,21 +493,26 @@ class _GeneralTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: [
-        Text('Apparence', style: Theme.of(context).textTheme.titleMedium),
+      children: cardSections(context, [
+        Text('Apparence', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
         SegmentedButton<ThemeMode>(
           segments: const [
-            ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.brightness_auto), label: Text('Système')),
-            ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode), label: Text('Clair')),
-            ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode), label: Text('Sombre')),
+            ButtonSegment(value: ThemeMode.system, label: Text('Système')),
+            ButtonSegment(value: ThemeMode.light, label: Text('Clair')),
+            ButtonSegment(value: ThemeMode.dark, label: Text('Sombre')),
           ],
           selected: {app.themeMode},
+          // sans coche : le segment choisi est coloré, et « Système » tient sur une ligne
+          showSelectedIcon: false,
           onSelectionChanged: (s) => app.setThemeMode(s.first),
         ),
         const SizedBox(height: 8),
         const Divider(),
-        Text('Serveur de données', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'Serveur de données',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const Text(
           'Par défaut : la publication quotidienne sur GitHub. Pour tester une usine locale : '
           'http://<adresse du PC>:8080/.',
@@ -515,7 +531,7 @@ class _GeneralTab extends StatelessWidget {
         const Divider(),
         _placesSection(context),
         const Divider(),
-        Text('Localisation', style: Theme.of(context).textTheme.titleMedium),
+        Text('Localisation', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Ma position sur la carte'),
@@ -524,7 +540,10 @@ class _GeneralTab extends StatelessWidget {
           onChanged: (v) => setShowMyPosition(context, app, v),
         ),
         const Divider(),
-        Text('Communauté (essai)', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'Communauté (essai)',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const Text(
           'Véhicules vus par les voyageurs, en plus de PRIM. Rien n\'est envoyé sans « Participer » : '
           'alors seule la position du véhicule, recalée sur la ligne, part pendant « Je suis dedans », '
@@ -558,7 +577,7 @@ class _GeneralTab extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         const Divider(),
-        Text('À propos', style: Theme.of(context).textTheme.titleMedium),
+        Text('À propos', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
         FutureBuilder(
           future: PackageInfo.fromPlatform(),
@@ -589,7 +608,7 @@ class _GeneralTab extends StatelessWidget {
             ),
           ),
         ),
-      ],
+      ]),
     );
   }
 }

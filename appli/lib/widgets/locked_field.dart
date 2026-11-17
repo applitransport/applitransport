@@ -69,7 +69,10 @@ class _LockedFieldState extends State<LockedField> {
           decoration: InputDecoration(
             labelText: widget.label,
             hintText: widget.emptyText,
-            border: const OutlineInputBorder(),
+            // fond gris, sans cadre (comme les autres champs de l'appli)
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
             suffixIcon: _editing ? null : const Icon(Icons.lock_outline, size: 18),
           ),
         ),

@@ -10,6 +10,7 @@ import '../poc/data.dart';
 import '../poc/line_vehicles.dart';
 import '../poc/position.dart';
 import '../poc/ride_control.dart';
+import '../widgets/card_decoration.dart';
 import '../widgets/line_badge.dart';
 import '../widgets/line_map.dart';
 import '../widgets/refresh_controls.dart';
@@ -88,7 +89,11 @@ class _LineStatusScreenState extends State<LineStatusScreen> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: app,
     builder: (context, _) => Scaffold(
-      appBar: AppBar(title: const Text('État de la ligne')),
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+        title: const Text('État de la ligne', style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
       body: SafeArea(
         top: false,
         child: line == null
@@ -132,23 +137,30 @@ class _LineStatusScreenState extends State<LineStatusScreen> {
         _selectors(context),
         if (app.ride != null) RideBanner(app: app),
         Expanded(
-          child: Stack(
-            children: [
-              LineMap(
-                showMe: app.showMyPosition,
-                key: ValueKey('${l.id}/$_dir'),
-                vehicleIcon: vehicleIcon(l.type),
-                confirmationColors: true,
-                shapes: [for (final v in d.variants) v.shape],
-                stops: d.stops,
-                color: l.color,
-                buses: buses,
-                alertStops: alertStops(reports),
-                // toucher un bus : sa fiche ; le retoucher : la referme
-                onBusTap: (id) => setState(() => _selected = _selected == id ? null : id),
+          // carte aux bords arrondis, comme les cartes de l'accueil
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Stack(
+                children: [
+                  LineMap(
+                    showMe: app.showMyPosition,
+                    key: ValueKey('${l.id}/$_dir'),
+                    vehicleIcon: vehicleIcon(l.type),
+                    confirmationColors: true,
+                    shapes: [for (final v in d.variants) v.shape],
+                    stops: d.stops,
+                    color: l.color,
+                    buses: buses,
+                    alertStops: alertStops(reports),
+                    // toucher un bus : sa fiche ; le retoucher : la referme
+                    onBusTap: (id) => setState(() => _selected = _selected == id ? null : id),
+                  ),
+                  if (_selected != null) Positioned(left: 0, right: 0, bottom: 0, child: _busCard(context)),
+                ],
               ),
-              if (_selected != null) Positioned(left: 0, right: 0, bottom: 0, child: _busCard(context)),
-            ],
+            ),
           ),
         ),
         // police système agrandie : les boutons restent sur une ligne
@@ -205,8 +217,11 @@ class _LineStatusScreenState extends State<LineStatusScreen> {
 
   Widget _selectors(BuildContext context) {
     final lines = {...app.preferred.where(app.hasSchedules), ?_lineId}.toList();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+    // ligne et sens dans une carte blanche (comme l'accueil)
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.fromLTRB(12, 2, 4, 2),
+      decoration: cardDecoration(context, radius: 18),
       child: Row(
         children: [
           DropdownButton<String>(
@@ -231,6 +246,7 @@ class _LineStatusScreenState extends State<LineStatusScreen> {
               child: DropdownButton<int>(
                 value: _dir,
                 isExpanded: true,
+                underline: const SizedBox(),
                 items: [
                   for (var i = 0; i < line!.directions.length; i++)
                     DropdownMenuItem(
@@ -392,12 +408,16 @@ class _LineStatusScreenState extends State<LineStatusScreen> {
             ),
             child: child,
           )
-        : OutlinedButton(
+        // tuile blanche ombrée, comme les tuiles de l'accueil
+        : TextButton(
             onPressed: onPressed,
-            style: OutlinedButton.styleFrom(
+            style: TextButton.styleFrom(
               padding: pad,
               foregroundColor: color,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+              elevation: 1,
+              shadowColor: const Color(0x3314212B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             child: child,
           );
