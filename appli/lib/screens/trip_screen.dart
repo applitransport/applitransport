@@ -4,8 +4,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../data/realtime.dart';
+import '../data/geocoder.dart';
+import '../data/places_store.dart' show normalizeWords;
 import '../poc/app_state.dart';
 import '../poc/data.dart';
 import '../poc/line_vehicles.dart';
@@ -18,14 +21,18 @@ import '../widgets/refresh_controls.dart';
 import '../widgets/traffic_button.dart';
 import 'itinerary_screen.dart';
 import 'lines_map_screen.dart';
+import 'walk_nav_screen.dart' show walkSpeed;
 
 const _horizonSec = 2 * 3600; // prochains départs seulement
 
 class _Journey {
-  _Journey(this.line, this.direction, this.variantIndex, this.trip, this.from, this.to);
+  _Journey(this.line, this.direction, this.variantIndex, this.trip, this.from, this.to, [this.walk = 0]);
   final DemoLine line;
   final Direction direction;
   final int variantIndex, trip, from, to;
+
+  /// Marche finale jusqu'au lieu choisi en arrivée (m, à vol d'oiseau ; 0 : arrivée à l'arrêt).
+  final double walk;
   Variant get variant => direction.variants[variantIndex];
 }
 
@@ -39,6 +46,62 @@ class TripScreen extends StatefulWidget {
 
 class _TripScreenState extends State<TripScreen> {
   StopArea? _origin, _destination;
+
+  /// Lieu (ou adresse, entreprise) choisi en arrivée : on vise les arrêts desservis en direct à moins
+  /// de [placeRadius] m, puis la marche.
+  StopArea? _place;
+  static const placeRadius = 500.0;
+
+  /// Lieu proposé dans la liste d'arrivée : un « arrêt » sans ligne, d'identifiant « place:… ».
+  static StopArea placeArea(String name, String detail, LatLng pos) => StopArea.fromJson({
+    'id': 'place:${pos.longitude};${pos.latitude}',
+    'name': name,
+    'town': detail,
+    'lines': const [],
+    'lat': pos.latitude,
+    'lon': pos.longitude,
+  });
+
+  static final _geocoder = Geocoder();
+  static String _latest = '';
+
+  /// Suggestions d'arrivée : les arrêts desservis en direct, puis les lieux (téléchargés, IGN) et les
+  /// entreprises (Sirene), cherchés quand la frappe s'arrête.
+  Future<Iterable<StopArea>> _withPlaces(List<StopArea> stops, String text) async {
+    final q = searchKey(text);
+    if (q.length < 3) return stops;
+    _latest = q;
+    await Future.delayed(const Duration(milliseconds: 450));
+    if (_latest != q) return stops;
+    final near = _origin?.pos;
+    final local = app.places.search(text, near: near, limit: 4);
+    const none = <GeoPlace>[];
+    final (ign, companies) = await (
+      _geocoder.search(text.trim()).timeout(const Duration(seconds: 4), onTimeout: () => none),
+      _geocoder.searchCompanies(text.trim()).timeout(const Duration(seconds: 4), onTimeout: () => none),
+    ).wait;
+    if (_latest != q) return stops;
+    final out = <StopArea>[...stops];
+    bool dup(String name, LatLng pos) => out.any(
+      (a) => normalizeWords(a.name) == normalizeWords(name) && const Distance().as(LengthUnit.Meter, a.pos, pos) < 150,
+    );
+    for (final (name, detail, pos) in [
+      for (final p in local) (p.name, p.detail, p.pos),
+      for (final g in [...ign, ...companies]) (g.name, g.detail, g.pos),
+    ]) {
+      if (!dup(name, pos)) out.add(placeArea(name, detail, pos));
+    }
+    return out;
+  }
+
+  /// Zones visées et marche finale (m) : l'arrêt d'arrivée, ou les arrêts proches du lieu choisi.
+  Map<String, double> get _targets {
+    if (_destination != null) return {_destination!.id: 0};
+    final p = _place;
+    if (p == null) return const {};
+    return {for (final (a, d) in nearbyAreas(_destinations, p.pos, radius: placeRadius, limit: 20)) a.id: d};
+  }
+
   Timer? _ticker;
   Key _fieldsKey = UniqueKey();
   late final List<StopArea> _boardingAreas = _computeBoardingAreas();
@@ -88,7 +151,7 @@ class _TripScreenState extends State<TripScreen> {
       if (l.directions.any(
         (d) => d.variants.any((v) {
           final i = v.indexOfArea(_origin!.id);
-          return i >= 0 && v.indexOfArea(_destination!.id, i + 1) > i;
+          return i >= 0 && _targets.keys.any((t) => v.indexOfArea(t, i + 1) > i);
         }),
       ))
         l,
@@ -100,17 +163,28 @@ class _TripScreenState extends State<TripScreen> {
 
   List<_Journey> _journeys(List<DemoLine> lines, int now) {
     final out = <_Journey>[];
+    final targets = _targets;
     for (final l in lines) {
       for (final d in l.directions) {
         for (var vi = 0; vi < d.variants.length; vi++) {
           final v = d.variants[vi];
           final i = v.indexOfArea(_origin!.id);
           if (i < 0) continue;
-          final j = v.indexOfArea(_destination!.id, i + 1);
-          if (j < 0) continue;
+          // arrêt visé le plus intéressant sur ce parcours : arrivée au lieu au plus tôt (bus + marche)
+          int? j;
+          var walk = 0.0;
+          for (final MapEntry(key: t, value: w) in targets.entries) {
+            final k = v.indexOfArea(t, i + 1);
+            if (k < 0) continue;
+            if (j == null || v.trips[0][k] + w / walkSpeed < v.trips[0][j] + walk / walkSpeed) {
+              j = k;
+              walk = w;
+            }
+          }
+          if (j == null) continue;
           for (var t = 0; t < v.trips.length; t++) {
             final dep = v.trips[t][i] + (app.rt(l.id, d.id, vi, t)?.delayAt(i) ?? 0);
-            if (dep >= now - 30 && dep <= now + _horizonSec) out.add(_Journey(l, d, vi, t, i, j));
+            if (dep >= now - 30 && dep <= now + _horizonSec) out.add(_Journey(l, d, vi, t, i, j, walk));
           }
         }
       }
@@ -202,44 +276,56 @@ class _TripScreenState extends State<TripScreen> {
   );
 
   /// Le texte tapé n'est pas un nom d'arrêt (un lieu, une adresse) : Itinéraire le cherche.
-  Widget _notAStop(BuildContext context, String query) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '« $query » n\'est pas un nom d\'arrêt.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Pour un lieu ou une adresse, Itinéraire trouve le trajet et les arrêts à proximité (internet).',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ItineraryScreen(
-                  app: app,
-                  from: _origin == null
-                      ? null
-                      : PlaceChoice(
-                          _origin!.label,
-                          _origin!.town.isEmpty ? 'Arrêt' : _origin!.town,
-                          'stop_area:${_origin!.id}',
-                          'arret',
-                        ),
-                  toQuery: query,
+  Widget _notAStop(BuildContext context, String query, {String? title}) => Center(
+    // défile si le clavier est ouvert (sinon le message déborde)
+    child: SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title ?? '« $query » n\'est pas un nom d\'arrêt.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Pour un lieu ou une adresse, Itinéraire trouve le trajet et les arrêts à proximité (internet).',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ItineraryScreen(
+                    app: app,
+                    from: _origin == null
+                        ? null
+                        : PlaceChoice(
+                            _origin!.label,
+                            _origin!.town.isEmpty ? 'Arrêt' : _origin!.town,
+                            'stop_area:${_origin!.id}',
+                            'arret',
+                          ),
+                    // lieu choisi : ses coordonnées ; sinon le texte tapé, à chercher dans Itinéraire
+                    to: _place == null
+                        ? null
+                        : PlaceChoice(
+                            _place!.name,
+                            _place!.town,
+                            '${_place!.pos.longitude};${_place!.pos.latitude}',
+                            'lieu',
+                          ),
+                    toQuery: _place == null ? query : null,
+                  ),
                 ),
               ),
+              icon: const Icon(Icons.directions),
+              label: const Text('Chercher ce lieu avec Itinéraire'),
             ),
-            icon: const Icon(Icons.directions),
-            label: const Text('Chercher ce lieu avec Itinéraire'),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );
@@ -326,13 +412,15 @@ class _TripScreenState extends State<TripScreen> {
       listenable: app,
       builder: (context, _) {
         final now = app.nowSec();
-        final ready = _origin != null && _destination != null;
+        final ready = _origin != null && _targets.isNotEmpty;
+        final targetAreas = [for (final id in _targets.keys) ?app.stopAreas[id]];
         final downloaded = ready ? _connecting : <DemoLine>[];
         // lignes qui desservent les deux zones mais ne sont pas sur l'appareil
         final missing = <CatalogLine>[
           if (ready)
             for (final id in _origin!.lines)
-              if (!app.hasSchedules(id) && _destination!.lines.contains(id) && app.line(id) != null) app.line(id)!,
+              if (!app.hasSchedules(id) && targetAreas.any((a) => a.lines.contains(id)) && app.line(id) != null)
+                app.line(id)!,
         ];
         final journeys = ready ? _journeys(downloaded, now) : <_Journey>[];
         final refreshed = downloaded
@@ -351,7 +439,7 @@ class _TripScreenState extends State<TripScreen> {
               if (ready && missing.isNotEmpty) _missingBanner(context, missing),
               if (ready && downloaded.isNotEmpty)
                 RefreshControls(
-                  key: ValueKey('${_origin!.id}>${_destination!.id}'),
+                  key: ValueKey('${_origin!.id}>${_targets.keys.join(',')}'),
                   // une seule requête « arrêt » donne les passages de toutes les lignes au départ
                   onRefresh: () => app.refreshStop(_origin!.id, downloaded.map((l) => l.id)),
                   single: true, // Actualiser seul, comme sur les autres écrans
@@ -378,8 +466,9 @@ class _TripScreenState extends State<TripScreen> {
       IconData icon,
       List<StopArea> options,
       StopArea? value,
-      void Function(StopArea?) onSet,
-    ) => Autocomplete<StopArea>(
+      void Function(StopArea?) onSet, {
+      bool withPlaces = false,
+    }) => Autocomplete<StopArea>(
       initialValue: TextEditingValue(text: value?.label ?? ''),
       displayStringForOption: (a) => a.label,
       optionsBuilder: (v) {
@@ -390,7 +479,8 @@ class _TripScreenState extends State<TripScreen> {
             if (mounted) setState(() {});
           });
         }
-        return searchStopAreas(options, v.text);
+        final stops = searchStopAreas(options, v.text);
+        return withPlaces ? _withPlaces(stops, v.text) : stops;
       },
       optionsViewBuilder: (context, onSelected, options) => Align(
         alignment: Alignment.topLeft,
@@ -422,7 +512,7 @@ class _TripScreenState extends State<TripScreen> {
                     subtitle: Text(
                       [
                         if (a.town.isNotEmpty) a.town,
-                        '${a.lines.length} ligne(s)',
+                        if (!a.id.startsWith('place:')) '${a.lines.length} ligne(s)',
                         ...{
                           for (final id in a.lines) app.networks[app.line(id)?.network] ?? '',
                         }.where((n) => n.isNotEmpty).take(2),
@@ -524,8 +614,14 @@ class _TripScreenState extends State<TripScreen> {
                         "Arrêt d'arrivée",
                         Icons.place,
                         _destinations,
-                        _destination,
-                        (v) => setState(() => _destination = v),
+                        _destination ?? _place,
+                        (v) => setState(() {
+                          // lieu, adresse ou entreprise : arrêts proches ; sinon l'arrêt lui-même
+                          final isPlace = v != null && v.id.startsWith('place:');
+                          _place = isPlace ? v : null;
+                          _destination = isPlace ? null : v;
+                        }),
+                        withPlaces: true,
                       ),
                     ],
                   ),
@@ -569,6 +665,7 @@ class _TripScreenState extends State<TripScreen> {
                   if (area == null || !mounted) return;
                   setState(() {
                     _destination = area;
+                    _place = null;
                     _fieldsKey = UniqueKey(); // recrée les champs avec la nouvelle arrivée
                   });
                 },
@@ -633,7 +730,15 @@ class _TripScreenState extends State<TripScreen> {
 
   Widget _results(BuildContext context, bool ready, bool nothingDownloaded, List<_Journey> journeys, int now) {
     if (_origin == null) return _nearbyList(context);
-    if (_destination == null) {
+    if (_place != null && _targets.isEmpty) {
+      // aucun arrêt desservi en direct près du lieu : Itinéraire, lieu prérempli
+      return _notAStop(
+        context,
+        _place!.name,
+        title: 'Aucune ligne directe ne s\'arrête à moins de ${distanceLabel(placeRadius)} de ${_place!.name}.',
+      );
+    }
+    if (_destination == null && _place == null) {
       // destination tapée qui n'est atteignable qu'avec un changement : proposer Itinéraire
       final q = _queries["Arrêt d'arrivée"] ?? '';
       if (searchKey(q).length >= 2 && searchStopAreas(_destinations, q).isEmpty) {
@@ -678,13 +783,19 @@ class _TripScreenState extends State<TripScreen> {
           onTap: () => _showBus(context, j),
           leading: LineBadge(name: j.line.name, color: j.line.color, textColor: j.line.textColor),
           title: Text(
-            '${hhmm(dep)} → ${hhmm(arr)}  (${duration(arr - dep)})',
+            j.walk > 0
+                // lieu : arrivée à pied comprise
+                ? '${hhmm(dep)} → ${hhmm(arr + (j.walk / walkSpeed).round())}  '
+                      '(${duration(arr + (j.walk / walkSpeed).round() - dep)})'
+                : '${hhmm(dep)} → ${hhmm(arr)}  (${duration(arr - dep)})',
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           // le quai précis compte dans une grande zone comme une gare
           subtitle: Text(
             'Direction ${j.variant.headsign}\nDépart : ${j.variant.stops[j.from].name}'
-            '${delay != null && delay.abs() >= 60 ? ' · prévu ${hhmm(j.variant.trips[j.trip][j.from])}' : ''}',
+            '${delay != null && delay.abs() >= 60 ? ' · prévu ${hhmm(j.variant.trips[j.trip][j.from])}' : ''}'
+            '${j.walk > 0 ? '\nDescente : ${j.variant.stops[j.to].name}, puis ${(j.walk / walkSpeed / 60).ceil().clamp(1, 999)} min '
+                      'à pied (${distanceLabel(j.walk)})' : ''}',
           ),
           isThreeLine: true,
           trailing: Column(
