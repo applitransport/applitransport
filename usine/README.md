@@ -20,3 +20,13 @@ localement car IDFM les renumérote à chaque publication. Une ligne n'est **rep
 effectifs changent (comparés jour par jour avec la publication précédente) ou si la version en place
 couvre moins de 21 jours : IDFM décale sa période d'un jour à chaque publication. L'appli ne retélécharge
 donc que les lignes réellement modifiées.
+
+## Lieux d'Île-de-France (OpenStreetMap)
+
+`python usine/lieux.py [--force]` : une fois par semaine (rien à faire si la base a moins de 6 jours),
+télécharge l'extrait Île-de-France de Geofabrik (≈ 340 Mo, supprimé ensuite), garde les lieux nommés qui
+sont des destinations (≈ 170 000 : commerces, restaurants, santé, culture, loisirs, gares), fusionne les
+doublons et publie `out/public/lieux/lieux.db.xz` (SQLite + index plein texte FTS5, ≈ 8 Mo) et
+`lieux.json` (date, nombre, taille, empreinte). ≈ 3 min et 600 Mo de mémoire. Données © contributeurs
+OpenStreetMap, licence ODbL.
+
