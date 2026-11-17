@@ -1,5 +1,5 @@
 // Accès à la position du téléphone : service activé et permission accordée, sinon un message clair.
-import 'package:geolocator/geolocator.dart';
+import 'geo.dart';
 
 /// Position précise refusée (Android 12+ : l'usager n'a accordé que la position approximative, à
 /// environ 2 km près).

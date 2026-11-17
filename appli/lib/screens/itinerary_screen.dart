@@ -8,7 +8,7 @@ import 'package:flutter/cupertino.dart'
     show CupertinoDatePicker, CupertinoDatePickerMode, CupertinoTheme, CupertinoThemeData, CupertinoTextThemeData;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
+import '../data/geo.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../data/geocoder.dart';

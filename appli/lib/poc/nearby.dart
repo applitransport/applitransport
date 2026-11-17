@@ -1,6 +1,6 @@
 // Arrêts à proximité de l'usager : calculés sur le téléphone à partir du catalogue (coordonnées des
 // zones d'arrêt) et des arrêts de la ligne, sans requête ni envoi.
-import 'package:geolocator/geolocator.dart';
+import '../data/geo.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../data/location.dart';

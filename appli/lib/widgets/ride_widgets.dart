@@ -1,7 +1,7 @@
 // Éléments d'interface des trajets « à bord », partagés par le suivi de ligne et l'état de la ligne :
 // bandeau du trajet en cours, demande de participation, « Je suis à bord » (choix de la course).
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
+import '../data/geo.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../data/location.dart';
