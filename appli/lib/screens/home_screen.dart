@@ -105,7 +105,8 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Text(
-            'Données © Île-de-France Mobilités · carte © OpenStreetMap · lieux et adresses © IGN',
+            'Données © Île-de-France Mobilités · carte © OpenStreetMap · lieux et adresses © IGN · '
+            'entreprises © INSEE (Sirene)',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),

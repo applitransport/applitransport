@@ -458,7 +458,9 @@ class _PlaceFieldState extends State<_PlaceField> {
     _latest = q;
     await Future.delayed(const Duration(milliseconds: 450));
     if (_latest != q) return local;
-    final places = await _geocoder.search(text.trim());
+    // lieux et adresses (IGN) et entreprises (Sirene), en parallèle
+    final (places0, companies) = await (_geocoder.search(text.trim()), _geocoder.searchCompanies(text.trim())).wait;
+    final places = [...places0, ...companies];
     if (_latest != q) return local;
     if (places.isEmpty && RegExp(r'\d').hasMatch(q)) {
       // géocodeur indisponible : adresses du calculateur PRIM (une requête)
@@ -472,7 +474,11 @@ class _PlaceFieldState extends State<_PlaceField> {
           g.name,
           g.detail,
           '${g.pos.longitude};${g.pos.latitude}', // coordonnées, comprises par le calculateur
-          g.isPoi ? 'lieu' : 'adresse',
+          g.isCompany
+              ? 'entreprise'
+              : g.isPoi
+              ? 'lieu'
+              : 'adresse',
           near: _nearLabel(g.pos),
         ),
     ];
@@ -501,6 +507,7 @@ class _PlaceFieldState extends State<_PlaceField> {
                     'position' => Icons.my_location,
                     'arret' => Icons.directions_bus_outlined,
                     'lieu' => Icons.place_outlined,
+                    'entreprise' => Icons.business_outlined,
                     _ => Icons.home_outlined,
                   }),
                   title: Text(p.label),
