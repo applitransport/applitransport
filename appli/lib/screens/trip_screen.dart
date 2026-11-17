@@ -11,6 +11,7 @@ import '../poc/data.dart';
 import '../poc/line_vehicles.dart';
 import '../poc/nearby.dart';
 import '../poc/position.dart';
+import '../widgets/card_decoration.dart';
 import '../widgets/line_badge.dart';
 import '../widgets/line_map.dart';
 import '../widgets/refresh_controls.dart';
@@ -247,11 +248,16 @@ class _TripScreenState extends State<TripScreen> {
     final theme = Theme.of(context);
     final list = _nearby;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       children: [
         Row(
           children: [
-            Expanded(child: Text('Arrêts près de moi', style: theme.textTheme.titleMedium)),
+            Expanded(
+              child: Text(
+                'Arrêts près de moi',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
             if (_locating)
               const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
             else
@@ -268,27 +274,34 @@ class _TripScreenState extends State<TripScreen> {
           const Text('Touchez « Me localiser » pour voir les arrêts autour de vous.')
         else if (list != null && list.isEmpty)
           Text('Aucun arrêt à moins de ${distanceLabel(nearbyRadius)}.'),
-        for (final (a, d) in list ?? const <(StopArea, double)>[])
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.place_outlined),
-            title: Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text('${distanceLabel(d)}${a.town.isEmpty ? '' : ' · ${a.town}'}'),
-                  for (final id in a.lines.take(8))
-                    if (app.line(id) case final l?)
-                      LineBadge(name: l.name, color: l.color, textColor: l.textColor, small: true),
-                  if (a.lines.length > 8) Text('+${a.lines.length - 8}'),
-                ],
-              ),
+        if (list != null && list.isNotEmpty)
+          Container(
+            decoration: cardDecoration(context, radius: 18),
+            child: Column(
+              children: [
+                for (final (a, d) in list)
+                  ListTile(
+                    leading: const Icon(Icons.place_outlined),
+                    title: Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text('${distanceLabel(d)}${a.town.isEmpty ? '' : ' · ${a.town}'}'),
+                          for (final id in a.lines.take(8))
+                            if (app.line(id) case final l?)
+                              LineBadge(name: l.name, color: l.color, textColor: l.textColor, small: true),
+                          if (a.lines.length > 8) Text('+${a.lines.length - 8}'),
+                        ],
+                      ),
+                    ),
+                    onTap: () => _pickOrigin(a),
+                  ),
+              ],
             ),
-            onTap: () => _pickOrigin(a),
           ),
         const SizedBox(height: 16),
         Text(
@@ -326,7 +339,11 @@ class _TripScreenState extends State<TripScreen> {
             .whereType<DateTime>()
             .fold<DateTime?>(null, (a, b) => a == null || b.isBefore(a) ? b : a);
         return Scaffold(
-          appBar: AppBar(title: const Text('Quelle ligne prendre ?')),
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+          appBar: AppBar(
+            title: const Text('Quelle ligne prendre ?', style: TextStyle(fontWeight: FontWeight.w700)),
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+          ),
           body: Column(
             children: [
               _fields(context),
@@ -423,9 +440,12 @@ class _TripScreenState extends State<TripScreen> {
         focusNode: focus,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: Icon(icon),
+          // fond gris, sans cadre (la carte et le pointillé font le lien), comme Itinéraire
+          filled: true,
+          fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           isDense: true,
-          border: const OutlineInputBorder(),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
           suffixIcon: ctrl.text.isEmpty
               ? null
               : IconButton(
@@ -439,52 +459,96 @@ class _TripScreenState extends State<TripScreen> {
       ),
     );
 
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       key: _fieldsKey,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Column(
+          // départ et arrivée dans une seule carte, reliés par un pointillé (comme Itinéraire)
+          Container(
+            decoration: cardDecoration(context),
+            padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
+            child: Row(
               children: [
-                field(
-                  'Arrêt de départ',
-                  Icons.trip_origin,
-                  _boardingAreas,
-                  _origin,
-                  (v) => setState(() {
-                    _origin = v;
-                    if (!_destinations.contains(_destination)) _destination = null;
-                  }),
+                SizedBox(
+                  width: 16,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: scheme.primary, width: 3),
+                        ),
+                      ),
+                      for (var i = 0; i < 6; i++)
+                        Container(
+                          width: 2,
+                          height: 4,
+                          margin: const EdgeInsets.symmetric(vertical: 2),
+                          color: scheme.outlineVariant,
+                        ),
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF2A541),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                field(
-                  "Arrêt d'arrivée",
-                  Icons.place,
-                  _destinations,
-                  _destination,
-                  (v) => setState(() => _destination = v),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    children: [
+                      field(
+                        'Arrêt de départ',
+                        Icons.trip_origin,
+                        _boardingAreas,
+                        _origin,
+                        (v) => setState(() {
+                          _origin = v;
+                          if (!_destinations.contains(_destination)) _destination = null;
+                        }),
+                      ),
+                      const SizedBox(height: 8),
+                      field(
+                        "Arrêt d'arrivée",
+                        Icons.place,
+                        _destinations,
+                        _destination,
+                        (v) => setState(() => _destination = v),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Toutes les lignes directes entre deux arrêts et leurs prochains départs, sans connexion. '
-                  'Avec un changement : Itinéraire.',
-                  style: Theme.of(context).textTheme.bodySmall,
+                IconButton.outlined(
+                  tooltip: 'Inverser',
+                  icon: const Icon(Icons.swap_vert),
+                  onPressed: _origin == null || _destination == null
+                      ? null
+                      : () => setState(() {
+                          final o = _origin;
+                          _origin = _destination;
+                          _destination = _destinations.contains(o) ? o : null;
+                          _fieldsKey = UniqueKey(); // recrée les champs avec les nouvelles valeurs
+                        }),
                 ),
               ],
             ),
           ),
-          IconButton(
-            tooltip: 'Inverser',
-            icon: const Icon(Icons.swap_vert),
-            onPressed: _origin == null || _destination == null
-                ? null
-                : () => setState(() {
-                    final o = _origin;
-                    _origin = _destination;
-                    _destination = _destinations.contains(o) ? o : null;
-                    _fieldsKey = UniqueKey(); // recrée les champs avec les nouvelles valeurs
-                  }),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+            child: Text(
+              'Toutes les lignes directes entre deux arrêts et leurs prochains départs, sans connexion. '
+              'Avec un changement : Itinéraire.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
           ),
         ],
       ),
