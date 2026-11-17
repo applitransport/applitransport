@@ -315,6 +315,38 @@ class AppState extends ChangeNotifier {
   // --- lignes préférées -------------------------------------------------------------
   List<String> get preferred => settings.preferred;
 
+  /// Sens et arrêt retenus pour une ligne (null : jamais consultée).
+  ({int dir, String stop})? lineStop(String lineId) {
+    // ligne jamais mémorisée : la dernière sélection du suivi de ligne, si c'est elle
+    final m =
+        settings.lineStops[lineId] ??
+        (settings.lastLine == lineId && settings.lastStop != null
+            ? {'dir': settings.lastDir, 'stop': settings.lastStop}
+            : null);
+    return m == null || m['stop'] == null ? null : (dir: (m['dir'] as num?)?.toInt() ?? 0, stop: m['stop'] as String);
+  }
+
+  /// Actualiser de l'accueil : serveur communautaire pour chaque ligne préférée, PRIM « arrêt » une fois
+  /// par zone d'arrêt (une requête donne toutes les lignes qui y passent), perturbations (15 min).
+  Future<void> refreshHome() async {
+    final byArea = <String, Set<String>>{};
+    final jobs = <Future<void>>[];
+    for (final id in preferred.where(hasSchedules)) {
+      jobs.add(refreshCommunity(id));
+      jobs.add(loadTraffic(id));
+      final ls = lineStop(id), l = timetable(id);
+      if (ls == null || l == null || ls.dir >= l.directions.length) continue;
+      final stop = l.directions[ls.dir].stops.where((s) => s.name == ls.stop).firstOrNull;
+      if (stop != null && stop.area.isNotEmpty) (byArea[stop.area] ??= {}).add(id);
+    }
+    if (token.isNotEmpty) {
+      for (final e in byArea.entries) {
+        jobs.add(refreshStop(e.key, e.value));
+      }
+    }
+    await Future.wait(jobs);
+  }
+
   void togglePreferred(String id) {
     if (preferred.contains(id)) {
       preferred.remove(id);
@@ -362,6 +394,8 @@ class AppState extends ChangeNotifier {
       ..lastLine = line
       ..lastDir = dir
       ..lastStop = stop ?? (same ? settings.lastStop : null);
+    // sens et arrêt retenus pour cette ligne (« Mes lignes » de l'accueil)
+    if (line != null && settings.lastStop != null) settings.lineStops[line] = {'dir': dir, 'stop': settings.lastStop};
     settings.save();
   }
 

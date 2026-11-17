@@ -78,6 +78,8 @@ class _LineScreenState extends State<LineScreen> {
     // localisation déjà autorisée : l'arrêt le plus proche de la ligne, s'il est à moins de 500 m
     if (widget.lineId == null && app.showMyPosition) _nearestStop(auto: true);
     if (_lineId != null) app.loadTraffic(_lineId!);
+    // ligne, sens et arrêt affichés : retenus (« Mes lignes » de l'accueil)
+    if (_usable) app.rememberSelection(_lineId, _dir, stop: _stop);
     _scrollToNextSoon();
     // les bus avancent entre deux requêtes : on redessine chaque seconde
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
@@ -166,7 +168,24 @@ class _LineScreenState extends State<LineScreen> {
     return ListenableBuilder(
       listenable: app,
       builder: (context, _) => Scaffold(
-        appBar: AppBar(title: const Text('Suivi de ligne')),
+        appBar: AppBar(
+          title: const Text('Suivi de ligne'),
+          actions: [
+            // « Mes lignes » de l'accueil : cette ligne, avec le sens et l'arrêt affichés
+            if (_lineId != null)
+              IconButton(
+                tooltip: app.preferred.contains(_lineId) ? 'Retirer de Mes lignes' : 'Ajouter à Mes lignes',
+                icon: Icon(
+                  app.preferred.contains(_lineId) ? Icons.star : Icons.star_border,
+                  color: app.preferred.contains(_lineId) ? const Color(0xFFF2A541) : null,
+                ),
+                onPressed: () {
+                  app.rememberSelection(_lineId, _dir, stop: _stop);
+                  app.togglePreferred(_lineId!);
+                },
+              ),
+          ],
+        ),
         // SafeArea : les boutons restent au-dessus de la barre de navigation Android
         body: SafeArea(
           top: false,

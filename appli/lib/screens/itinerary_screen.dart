@@ -4,6 +4,8 @@
 // qui corrige chaque étape en transport (le calculateur n'applique le temps réel qu'à certains trains).
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart'
+    show CupertinoDatePicker, CupertinoDatePickerMode, CupertinoTheme, CupertinoThemeData, CupertinoTextThemeData;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -313,7 +315,7 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
                   onSelectionChanged: (s) async {
                     final w = s.first;
                     if (w != 0) {
-                      final t = await showTimePicker(context: context, initialTime: time);
+                      final t = await _pickTime(context, time, w == 2 ? 'Arriver à' : 'Partir à');
                       if (t == null) return;
                       _time = t;
                     }
@@ -565,6 +567,49 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+
+  /// Choix de l'heure par roulettes (heures, minutes), sans le cadran qui fait vibrer le téléphone.
+  Future<TimeOfDay?> _pickTime(BuildContext context, TimeOfDay initial, String title) {
+    var picked = initial;
+    return showModalBottomSheet<TimeOfDay>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+              child: Row(
+                children: [
+                  Expanded(child: Text(title, style: Theme.of(ctx).textTheme.titleMedium)),
+                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+                  FilledButton(onPressed: () => Navigator.pop(ctx, picked), child: const Text('OK')),
+                ],
+              ),
+            ),
+            SizedBox(
+              height: 200,
+              child: CupertinoTheme(
+                data: CupertinoThemeData(
+                  brightness: Theme.of(ctx).brightness,
+                  textTheme: CupertinoTextThemeData(
+                    dateTimePickerTextStyle: TextStyle(fontSize: 22, color: Theme.of(ctx).colorScheme.onSurface),
+                  ),
+                ),
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  use24hFormat: true,
+                  minuteInterval: 1,
+                  initialDateTime: DateTime(2000, 1, 1, initial.hour, initial.minute),
+                  onDateTimeChanged: (d) => picked = TimeOfDay(hour: d.hour, minute: d.minute),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

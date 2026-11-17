@@ -36,7 +36,7 @@ Future<void> main() async {
   app.dailyCheck();
 }
 
-const _seed = Color(0xFF1B5E7A);
+const _seed = Color(0xFF0E5A73);
 
 class BusApp extends StatelessWidget {
   const BusApp({super.key, required this.app});
