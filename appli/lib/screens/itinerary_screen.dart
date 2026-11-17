@@ -1099,26 +1099,29 @@ class _JourneyCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ligne 1 : heures et départ ; ligne 2 : durée et correspondances (sans coupure au milieu)
               Row(
                 children: [
-                  Text('${hhmm(timed.start)} → ${hhmm(timed.end)}', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(width: 8),
-                  Flexible(
+                  Expanded(
                     child: Text(
-                      '${duration(timed.end - timed.start)} · '
-                      '${j.transit.isEmpty
-                          ? 'à pied'
-                          : j.transfers == 0
-                          ? 'direct'
-                          : '${j.transfers} corresp.'}',
+                      '${hhmm(timed.start)} → ${hhmm(timed.end)}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                     ),
                   ),
-                  const Spacer(),
                   Text(
                     timed.start <= now ? 'partez maintenant' : 'dans ${duration(timed.start - now)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: scheme.primary),
                   ),
                 ],
+              ),
+              Text(
+                '${duration(timed.end - timed.start)} · '
+                '${j.transit.isEmpty
+                    ? 'à pied'
+                    : j.transfers == 0
+                    ? 'direct'
+                    : '${j.transfers} correspondance${j.transfers > 1 ? 's' : ''}'}',
+                style: TextStyle(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 6),
               Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 2, runSpacing: 4, children: steps),

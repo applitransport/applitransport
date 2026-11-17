@@ -134,45 +134,70 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: app,
-    builder: (context, _) => Scaffold(
-      body: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          // icônes de la barre d'état : claires sur le bandeau, foncées sur le reste quand on fait défiler
-          AnnotatedRegion<SystemUiOverlayStyle>(value: SystemUiOverlayStyle.light, child: _header(context)),
-          AnnotatedRegion<SystemUiOverlayStyle>(
-            value: Theme.of(context).brightness == Brightness.dark
-                ? SystemUiOverlayStyle.light
-                : SystemUiOverlayStyle.dark,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (app.appUpdate != null) _updateBanner(context),
-                  _myLines(context),
-                  const SizedBox(height: 20),
-                  Text('Explorer', style: _sectionStyle(context)),
-                  const SizedBox(height: 10),
-                  _tiles(context),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Données © Île-de-France Mobilités · carte © OpenStreetMap · lieux et adresses © IGN · '
-                    'entreprises © INSEE (Sirene)',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
+    builder: (context, _) {
+      final scheme = Theme.of(context).colorScheme;
+      return Scaffold(
+        backgroundColor: scheme.surfaceContainerLow,
+        // une seule page : bandeau, deux lignes favorites, les quatre fonctions en bas (défile seulement
+        // si l'écran est trop petit)
+        body: LayoutBuilder(
+          builder: (context, box) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: box.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AnnotatedRegion<SystemUiOverlayStyle>(value: SystemUiOverlayStyle.light, child: _header(context)),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [if (app.appUpdate != null) _updateBanner(context), _myLines(context)],
+                      ),
+                    ),
+                    const Spacer(),
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _tiles(context),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Données © Île-de-France Mobilités · carte © OpenStreetMap · lieux et adresses © IGN · '
+                            'entreprises © INSEE (Sirene)',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ],
-      ),
-    ),
+        ),
+      );
+    },
   );
 
   TextStyle? _sectionStyle(BuildContext context) =>
       Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700);
+
+  /// Carte blanche arrondie et ombrée (style de la maquette).
+  BoxDecoration _card(BuildContext context, {double radius = 20}) {
+    final scheme = Theme.of(context).colorScheme;
+    return BoxDecoration(
+      color: scheme.surfaceContainerLowest,
+      borderRadius: BorderRadius.circular(radius),
+      boxShadow: const [
+        BoxShadow(color: Color(0x0F14212B), blurRadius: 2, offset: Offset(0, 1)),
+        BoxShadow(color: Color(0x1214212B), blurRadius: 18, offset: Offset(0, 6)),
+      ],
+    );
+  }
 
   // --- bandeau : titre, ↻, réglages, « Où allez-vous ? », raccourcis -----------------------
   Widget _header(BuildContext context) {
@@ -285,30 +310,29 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- mes lignes ------------------------------------------------------------------------
+  // --- lignes favorites (les deux premières) ---------------------------------------------
   Widget _myLines(BuildContext context) {
-    final lines = app.preferred.where(app.hasSchedules).toList();
+    final all = app.preferred.where(app.hasSchedules).toList();
+    final lines = all.take(2).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
-            Expanded(child: Text('Mes lignes', style: _sectionStyle(context))),
+            Expanded(child: Text('Lignes favorites', style: _sectionStyle(context))),
             TextButton(
-              onPressed: () => _open(SettingsScreen(app: app)),
-              child: const Text('Gérer'),
+              onPressed: () => _open(LineScreen(app: app)),
+              child: Text(all.length > 2 ? 'Toutes (${all.length})' : 'Suivi de ligne'),
             ),
           ],
         ),
         if (lines.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'Ajoutez vos lignes avec l\'étoile du Suivi de ligne : leurs prochains passages à votre arrêt '
-                's\'afficheront ici.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+          Container(
+            decoration: _card(context),
+            padding: const EdgeInsets.all(16),
+            child: const Text(
+              'Ajoutez vos lignes avec l\'étoile du Suivi de ligne : les prochains passages à votre arrêt '
+              's\'afficheront ici.',
             ),
           ),
         for (final id in lines) _lineCard(context, id),
@@ -333,13 +357,13 @@ class _HomeScreenState extends State<HomeScreen> {
       final (bg, fg, label) = switch (p.source) {
         PassageSource.crowd => (const Color(0xFFE3F2E8), const Color(0xFF14532D), 'vu par un voyageur'),
         PassageSource.prim => (scheme.primaryContainer, scheme.onPrimaryContainer, 'PRIM'),
-        PassageSource.theoretical => (scheme.surfaceContainerHighest, scheme.onSurfaceVariant, 'théorique'),
+        PassageSource.theoretical => (scheme.surfaceContainerHigh, scheme.onSurfaceVariant, 'théorique'),
       };
       final left = p.time - now;
       return Expanded(
         child: Container(
           margin: const EdgeInsets.only(right: 6),
-          padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+          padding: const EdgeInsets.fromLTRB(10, 7, 6, 7),
           decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,7 +377,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 left < 60 ? 'à l\'arrêt' : duration(left),
                 maxLines: 1,
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: fg),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: fg, letterSpacing: -0.3),
               ),
               Text(hhmm(p.time), style: TextStyle(fontSize: 11, color: fg)),
             ],
@@ -362,116 +386,141 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return Card(
+    final title = stop == null
+        ? [info?.longLabel, info?.description].whereType<String>().where((x) => x.isNotEmpty).firstOrNull ?? l.name
+        : '$stop → ${d!.label}';
+    return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          // le suivi de ligne s'ouvre sur cette ligne, ce sens et cet arrêt (sinon le premier arrêt)
-          app.rememberSelection(id, dir, stop: stop);
-          _open(LineScreen(app: app));
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  LineBadge(name: l.name, color: l.color, textColor: l.textColor),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          stop == null
-                              ? [
-                                      info?.longLabel,
-                                      info?.description,
-                                    ].whereType<String>().where((x) => x.isNotEmpty).firstOrNull ??
-                                    l.name
-                              : '$stop → ${d!.label}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                        ),
-                        if (disruptions)
+      decoration: _card(context),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            // le suivi de ligne s'ouvre sur cette ligne, ce sens et cet arrêt (sinon le premier arrêt)
+            app.rememberSelection(id, dir, stop: stop);
+            _open(LineScreen(app: app));
+          },
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    LineBadge(name: l.name, color: l.color, textColor: l.textColor),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            '⚠ Perturbation en cours',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.orange.shade800),
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                           ),
-                      ],
+                          if (disruptions)
+                            Text(
+                              '⚠ Perturbation en cours',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.orange.shade800,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  if (disruptions) TrafficButton(app: app, lineId: id, compact: true),
-                  if (stop != null && l.directions.length > 1)
-                    IconButton(
-                      tooltip: 'Sens inverse',
-                      icon: const Icon(Icons.swap_vert),
-                      onPressed: () {
-                        final other = 1 - dir;
-                        // même arrêt dans l'autre sens s'il y passe, sinon son premier arrêt
-                        final same = l.directions[other].stops.any((x) => x.name == stop);
-                        app.rememberSelection(id, other, stop: same ? stop : l.directions[other].stops.first.name);
-                        setState(() {});
-                      },
-                    ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              if (stop == null)
-                Text(
-                  'Choisir un arrêt',
-                  style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600),
-                )
-              else if (passages.isEmpty)
-                Text('Plus de passage aujourd\'hui.', style: TextStyle(color: scheme.onSurfaceVariant))
-              else
-                Row(children: [for (final p in passages) slot(p)]),
-            ],
+                    if (disruptions) TrafficButton(app: app, lineId: id, compact: true),
+                    if (stop != null && l.directions.length > 1)
+                      IconButton.outlined(
+                        tooltip: 'Sens inverse',
+                        icon: const Icon(Icons.swap_vert, size: 20),
+                        onPressed: () {
+                          final other = 1 - dir;
+                          // même arrêt dans l'autre sens s'il y passe, sinon son premier arrêt
+                          final same = l.directions[other].stops.any((x) => x.name == stop);
+                          app.rememberSelection(id, other, stop: same ? stop : l.directions[other].stops.first.name);
+                          setState(() {});
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (stop == null)
+                  Text(
+                    'Choisir un arrêt',
+                    style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600),
+                  )
+                else if (passages.isEmpty)
+                  Text('Plus de passage aujourd\'hui.', style: TextStyle(color: scheme.onSurfaceVariant))
+                else
+                  Row(children: [for (final p in passages) slot(p)]),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // --- les quatre fonctions ----------------------------------------------------------------
+  // --- les quatre fonctions, en bas ----------------------------------------------------------
   Widget _tiles(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    Widget tile(IconData icon, String title, String text, Widget screen) => Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => _open(screen),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 28, color: scheme.primary),
-              const SizedBox(height: 8),
-              Text(title, maxLines: 2, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-              const SizedBox(height: 2),
-              Text(text, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
-            ],
+    Widget tile(IconData icon, String title, String text, Widget screen) => Expanded(
+      child: Container(
+        decoration: _card(context, radius: 18),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => _open(screen),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Icon(icon, size: 26, color: scheme.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(title, maxLines: 2, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                        Text(
+                          text,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      padding: EdgeInsets.zero,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 1.15,
+    return Column(
       children: [
-        tile(Icons.directions, 'Itinéraire', 'Porte à porte, avec correspondances', ItineraryScreen(app: app)),
-        tile(Icons.alt_route, 'Quelle ligne prendre ?', 'Lignes directes, sans connexion', TripScreen(app: app)),
-        tile(Icons.timeline, 'Suivi de ligne', 'Horaires et véhicules en direct', LineScreen(app: app)),
-        tile(Icons.campaign_outlined, 'État de la ligne', 'Signalements des voyageurs', LineStatusScreen(app: app)),
+        Row(
+          children: [
+            tile(Icons.directions, 'Itinéraire', 'Porte à porte', ItineraryScreen(app: app)),
+            const SizedBox(width: 10),
+            tile(Icons.alt_route, 'Quelle ligne ?', 'Sans connexion', TripScreen(app: app)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            tile(Icons.timeline, 'Suivi de ligne', 'Bus en direct', LineScreen(app: app)),
+            const SizedBox(width: 10),
+            tile(Icons.campaign_outlined, 'État de la ligne', 'Signalements', LineStatusScreen(app: app)),
+          ],
+        ),
       ],
     );
   }
