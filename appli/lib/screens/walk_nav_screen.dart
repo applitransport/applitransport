@@ -138,6 +138,9 @@ class _WalkNavScreenState extends State<WalkNavScreen> with SingleTickerProvider
   Duration _lastFrame = Duration.zero;
   bool _moving = false; // déplacement de caméra en cours (on n'en empile pas)
   bool _dirty = false; // position changée : recentrer
+
+  /// Angle de la flèche de l'usager à l'écran (degrés) : seule elle se redessine à chaque image.
+  final _arrow = ValueNotifier<double?>(null);
   double _zoom = 17;
   Timer? _ticker;
   LatLng? _me;
@@ -192,6 +195,7 @@ class _WalkNavScreenState extends State<WalkNavScreen> with SingleTickerProvider
     _gps?.cancel();
     _compass?.cancel();
     _frames.dispose();
+    _arrow.dispose();
     _ticker?.cancel();
     super.dispose();
   }
@@ -289,6 +293,8 @@ class _WalkNavScreenState extends State<WalkNavScreen> with SingleTickerProvider
       }
     }
     if (_dirty) _moveCamera();
+    // flèche : vers le haut si la carte est orientée dans ma direction, sinon mon cap
+    _arrow.value = _shown == null ? null : (_headingUp ? 0 : _shown);
   }
 
   /// Centre la carte sur l'usager et l'oriente (sans animation : l'interpolation est faite par image).
@@ -349,6 +355,30 @@ class _WalkNavScreenState extends State<WalkNavScreen> with SingleTickerProvider
                     onCameraIdle: () => _zoom = _map?.cameraPosition?.zoom ?? _zoom,
                   ),
                 ),
+                // flèche de l'usager, au centre (la carte y est centrée sur lui), même angle que la carte
+                if (_follow && _me != null)
+                  Center(
+                    child: IgnorePointer(
+                      child: ValueListenableBuilder(
+                        valueListenable: _arrow,
+                        builder: (context, angle, _) => angle == null
+                            ? const SizedBox.shrink()
+                            : Transform.rotate(
+                                angle: angle * math.pi / 180,
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [BoxShadow(blurRadius: 4, color: Colors.black38)],
+                                  ),
+                                  child: const Icon(Icons.navigation, color: Color(0xFF1E88E5), size: 28),
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
                 Positioned(
                   right: 12,
                   top: 12,
