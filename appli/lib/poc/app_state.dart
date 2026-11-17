@@ -29,6 +29,50 @@ class AppState extends ChangeNotifier {
     places = PlacesStore(repo.dir, () => settings.dataUrl.endsWith('/') ? settings.dataUrl : '${settings.dataUrl}/');
   }
 
+  // --- favoris d'Itinéraire (sur l'appareil seulement) ---------------------------------
+  List<Map<String, dynamic>> get favPlaces => settings.favPlaces;
+  List<Map<String, dynamic>> get favTrips => settings.favTrips;
+
+  /// Enregistre [place] comme favori. Domicile et Travail sont uniques : ils remplacent le précédent.
+  void saveFavPlace(String role, String name, Map<String, dynamic> place) {
+    if (role != 'autre') settings.favPlaces.removeWhere((f) => f['role'] == role);
+    settings.favPlaces.removeWhere((f) => (f['place'] as Map)['ref'] == place['ref'] && f['role'] == role);
+    settings.favPlaces.add({'role': role, 'name': name, 'place': place});
+    settings.save();
+    notifyListeners();
+  }
+
+  void renameFavPlace(Map<String, dynamic> fav, String name) {
+    fav['name'] = name;
+    settings.save();
+    notifyListeners();
+  }
+
+  void removeFavPlace(Map<String, dynamic> fav) {
+    settings.favPlaces.remove(fav);
+    settings.save();
+    notifyListeners();
+  }
+
+  /// Trajet favori : 3 au plus (le plus ancien laisse sa place).
+  void saveFavTrip(Map<String, dynamic> from, Map<String, dynamic> to) {
+    settings.favTrips.removeWhere(
+      (t) => (t['from'] as Map)['ref'] == from['ref'] && (t['to'] as Map)['ref'] == to['ref'],
+    );
+    settings.favTrips.add({'from': from, 'to': to});
+    while (settings.favTrips.length > 3) {
+      settings.favTrips.removeAt(0);
+    }
+    settings.save();
+    notifyListeners();
+  }
+
+  void removeFavTrip(Map<String, dynamic> trip) {
+    settings.favTrips.remove(trip);
+    settings.save();
+    notifyListeners();
+  }
+
   /// Lieux d'Île-de-France (OpenStreetMap), téléchargés à la demande.
   late final PlacesStore places;
 

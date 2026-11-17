@@ -483,20 +483,6 @@ class _GeneralTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('Actualisation automatique', style: Theme.of(context).textTheme.titleMedium),
-        Text(
-          'Durée : ${app.autoMinutes} min · une requête toutes les 30 s '
-          '(≈ ${app.autoMinutes * 2} requêtes par session)',
-        ),
-        Slider(
-          value: app.autoMinutes.toDouble(),
-          min: 1,
-          max: 10,
-          divisions: 9,
-          label: '${app.autoMinutes} min',
-          onChanged: (v) => app.setAutoMinutes(v.round()),
-        ),
-        const Divider(),
         Text('Apparence', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         SegmentedButton<ThemeMode>(

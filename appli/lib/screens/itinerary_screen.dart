@@ -36,10 +36,30 @@ IconData modeIcon(String? mode) {
 
 /// Lieu choisi : [ref] = identifiant pour le calculateur (null : ma position, résolue au moment de chercher).
 class PlaceChoice {
-  const PlaceChoice(this.label, this.detail, this.ref, this.kind, {this.near});
+  const PlaceChoice(this.label, this.detail, this.ref, this.kind, {this.near, this.favRole});
   final String label, detail;
   final String? ref;
-  final String kind; // position, arret, lieu, adresse
+  final String kind; // position, arret, lieu, entreprise, adresse
+
+  /// Lieu favori : domicile, travail ou autre (null : pas un favori).
+  final String? favRole;
+
+  Map<String, dynamic> toJson() => {'label': label, 'detail': detail, 'ref': ref, 'kind': kind, 'near': near};
+
+  static PlaceChoice fromJson(Map j, {String? name, String? favRole}) => PlaceChoice(
+    name ?? j['label'] as String,
+    name == null
+        ? j['detail'] as String? ?? ''
+        : [j['label'], j['detail']].where((x) => '${x ?? ''}'.isNotEmpty).join(' · '),
+    j['ref'] as String?,
+    j['kind'] as String? ?? 'lieu',
+    near: j['near'] as String?,
+    favRole: favRole,
+  );
+
+  /// Lieu favori enregistré → proposition (son nom, puis le lieu en détail).
+  static PlaceChoice fromFav(Map<String, dynamic> f) =>
+      fromJson(f['place'] as Map, name: f['name'] as String, favRole: f['role'] as String);
 
   /// Lieu ou adresse : « Arrêt le plus proche : Lycée Descartes (250 m) ».
   final String? near;
@@ -465,6 +485,130 @@ class _PlaceFieldState extends State<_PlaceField> {
 
   static final _geocoder = Geocoder();
 
+  static int _roleOrder(String? r) => switch (r) {
+    'domicile' => 0,
+    'travail' => 1,
+    _ => 2,
+  };
+
+  static IconData favIcon(String? role) => switch (role) {
+    'domicile' => Icons.home,
+    'travail' => Icons.work,
+    _ => Icons.star,
+  };
+
+  bool get _isFav => value != null && app.favPlaces.any((f) => (f['place'] as Map)['ref'] == value!.ref);
+
+  /// Étoile du champ : enregistrer le lieu choisi comme Domicile, Travail ou autre favori.
+  Future<void> _favSheet(BuildContext context) async {
+    final v = value;
+    if (v == null) return;
+    final place = v.favRole != null
+        ? (app.favPlaces.firstWhere((f) => (f['place'] as Map)['ref'] == v.ref)['place'] as Map<String, dynamic>)
+        : v.toJson();
+    final existing = app.favPlaces.where((f) => (f['place'] as Map)['ref'] == v.ref).toList();
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text('Enregistrer « ${place['label']} »'),
+              subtitle: const Text('Sur ce téléphone seulement'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: const Text('Domicile'),
+              onTap: () {
+                app.saveFavPlace('domicile', 'Domicile', place);
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.work),
+              title: const Text('Travail'),
+              onTap: () {
+                app.saveFavPlace('travail', 'Travail', place);
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.star),
+              title: const Text('Autre favori…'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final name = await _askName(context, '${place['label']}');
+                if (name != null) app.saveFavPlace('autre', name, place);
+              },
+            ),
+            for (final f in existing)
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: Text('Retirer « ${f['name']} » des favoris'),
+                onTap: () {
+                  app.removeFavPlace(f);
+                  Navigator.pop(ctx);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Future<String?> _askName(BuildContext context, String initial, {String title = 'Nom du favori'}) {
+    final ctrl = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(controller: ctrl, autofocus: true, textCapitalization: TextCapitalization.sentences),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim().isEmpty ? null : ctrl.text.trim()),
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Appui long sur un favori proposé : le renommer ou le retirer.
+  Future<void> _editFav(BuildContext context, PlaceChoice p) async {
+    final f = app.favPlaces.where((f) => (f['place'] as Map)['ref'] == p.ref && f['name'] == p.label).firstOrNull;
+    if (f == null) return;
+    await showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(title: Text('${f['name']}'), subtitle: Text('${(f['place'] as Map)['label']}')),
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Renommer'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final name = await _askName(context, '${f['name']}');
+                if (name != null) app.renameFavPlace(f, name);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Retirer des favoris'),
+              onTap: () {
+                app.removeFavPlace(f);
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// « Arrêt le plus proche : Lycée Descartes (250 m) », calculé sur le téléphone.
   String? _nearLabel(LatLng pos) {
     final n = nearbyAreas(app.stopAreas.values, pos, radius: 2000, limit: 1).firstOrNull;
@@ -474,8 +618,14 @@ class _PlaceFieldState extends State<_PlaceField> {
   Future<List<PlaceChoice>> _options(String text) async {
     final q = searchKey(text);
     final stops = q.length >= 2 ? searchStopAreas(app.stopAreas.values, q, limit: 6) : const <StopArea>[];
+    // lieux favoris : tous avant de taper, sinon ceux dont le nom ou le lieu correspond
+    final favs = [
+      for (final f in app.favPlaces)
+        if (q.isEmpty || searchKey('${f['name']} ${(f['place'] as Map)['label']}').contains(q)) PlaceChoice.fromFav(f),
+    ]..sort((a, b) => _roleOrder(a.favRole) - _roleOrder(b.favRole));
     final local = <PlaceChoice>[
       if (q.isEmpty || 'ma position'.contains(q)) PlaceChoice.myPosition,
+      ...favs,
       for (final a in stops)
         PlaceChoice(
           a.label,
@@ -554,16 +704,22 @@ class _PlaceFieldState extends State<_PlaceField> {
               for (final p in options)
                 ListTile(
                   dense: true,
-                  leading: Icon(switch (p.kind) {
-                    'position' => Icons.my_location,
-                    'arret' => Icons.directions_bus_outlined,
-                    'lieu' => Icons.place_outlined,
-                    'entreprise' => Icons.business_outlined,
-                    _ => Icons.home_outlined,
-                  }),
+                  leading: Icon(
+                    p.favRole != null
+                        ? favIcon(p.favRole)
+                        : switch (p.kind) {
+                            'position' => Icons.my_location,
+                            'arret' => Icons.directions_bus_outlined,
+                            'lieu' => Icons.place_outlined,
+                            'entreprise' => Icons.business_outlined,
+                            _ => Icons.home_outlined,
+                          },
+                    color: p.favRole != null ? Colors.amber.shade700 : null,
+                  ),
                   title: Text(p.label),
                   subtitle: Text([p.detail, ?p.near].join('\n')),
                   onTap: () => onSelected(p),
+                  onLongPress: p.favRole == null ? null : () => _editFav(context, p),
                 ),
             ],
           ),
@@ -591,6 +747,14 @@ class _PlaceFieldState extends State<_PlaceField> {
           helperText: value?.near,
           helperMaxLines: 2,
           prefixIcon: Icon(icon),
+          // lieu choisi : étoile pour l'enregistrer en favori (pas « ma position », qui change)
+          suffixIcon: value == null || value!.kind == 'position'
+              ? null
+              : IconButton(
+                  tooltip: 'Favori',
+                  icon: Icon(_isFav ? Icons.star : Icons.star_border, color: _isFav ? Colors.amber.shade700 : null),
+                  onPressed: () => _favSheet(context),
+                ),
           isDense: true,
           border: const OutlineInputBorder(),
         ),
