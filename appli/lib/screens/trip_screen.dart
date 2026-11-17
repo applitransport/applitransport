@@ -17,6 +17,7 @@ import '../widgets/line_map.dart';
 import '../widgets/refresh_controls.dart';
 import '../widgets/traffic_button.dart';
 import 'itinerary_screen.dart';
+import 'lines_map_screen.dart';
 
 const _horizonSec = 2 * 3600; // prochains départs seulement
 
@@ -442,6 +443,8 @@ class _TripScreenState extends State<TripScreen> {
           labelText: label,
           // fond gris, sans cadre (la carte et le pointillé font le lien), comme Itinéraire
           filled: true,
+          // pas de libellé au-dessus d'un champ rempli : le pointillé distingue départ et arrivée
+          floatingLabelBehavior: FloatingLabelBehavior.never,
           fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           isDense: true,
@@ -550,6 +553,27 @@ class _TripScreenState extends State<TripScreen> {
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ),
+          // carte de toutes les lignes de l'arrêt de départ, jusqu'à leurs terminus
+          if (_origin != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.map_outlined),
+                label: Text('Carte des lignes de ${_origin!.label}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                onPressed: () async {
+                  final area = await Navigator.of(context).push<StopArea>(
+                    MaterialPageRoute(
+                      builder: (_) => LinesMapScreen(app: app, origin: _origin!),
+                    ),
+                  );
+                  if (area == null || !mounted) return;
+                  setState(() {
+                    _destination = area;
+                    _fieldsKey = UniqueKey(); // recrée les champs avec la nouvelle arrivée
+                  });
+                },
+              ),
+            ),
         ],
       ),
     );

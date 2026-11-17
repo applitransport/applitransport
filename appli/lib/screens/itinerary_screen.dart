@@ -1130,6 +1130,8 @@ class _PlaceFieldState extends State<_PlaceField> {
           helperMaxLines: 2,
           // fond gris, sans cadre (la carte et le pointillé font le lien)
           filled: true,
+          // pas de libellé au-dessus d'un champ rempli : le pointillé distingue départ et arrivée
+          floatingLabelBehavior: FloatingLabelBehavior.never,
           fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           // lieu choisi : étoile pour l'enregistrer en favori (pas « ma position », qui change)
