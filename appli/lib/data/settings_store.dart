@@ -43,6 +43,7 @@ class SettingsStore {
         s.lastStop = j['last_stop'];
         s.favPlaces = [for (final f in (j['fav_places'] ?? const []) as List) Map<String, dynamic>.from(f)];
         s.favTrips = [for (final f in (j['fav_trips'] ?? const []) as List) Map<String, dynamic>.from(f)];
+        s.recentTrips = [for (final f in (j['recent_trips'] ?? const []) as List) Map<String, dynamic>.from(f)];
       } on FormatException {
         // fichier abîmé : on repart des réglages par défaut
       }
@@ -82,6 +83,9 @@ class SettingsStore {
   /// Trajets favoris (Itinéraire, 3 au plus) : {from: lieu, to: lieu}.
   List<Map<String, dynamic>> favTrips = [];
 
+  /// Recherches récentes (Itinéraire, 15 au plus, la plus récente d'abord) : {from, to, at}.
+  List<Map<String, dynamic>> recentTrips = [];
+
   Future<void> save() async {
     final tmp = File('${_file.path}.tmp');
     await tmp.writeAsString(
@@ -101,6 +105,7 @@ class SettingsStore {
         'last_stop': lastStop,
         'fav_places': favPlaces,
         'fav_trips': favTrips,
+        'recent_trips': recentTrips,
       }),
     );
     await tmp.rename(_file.path);

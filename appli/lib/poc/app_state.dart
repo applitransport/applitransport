@@ -67,6 +67,30 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  List<Map<String, dynamic>> get recentTrips => settings.recentTrips;
+
+  /// Recherche lancée : en tête des récentes (une seule fois par trajet, 15 au plus).
+  void addRecentTrip(Map<String, dynamic> from, Map<String, dynamic> to) {
+    bool same(Map a, Map b) => a['ref'] == b['ref'] && a['kind'] == b['kind'] && a['label'] == b['label'];
+    settings.recentTrips.removeWhere((t) => same(t['from'] as Map, from) && same(t['to'] as Map, to));
+    settings.recentTrips.insert(0, {'from': from, 'to': to, 'at': DateTime.now().toIso8601String()});
+    if (settings.recentTrips.length > 15) settings.recentTrips.removeRange(15, settings.recentTrips.length);
+    settings.save();
+    notifyListeners();
+  }
+
+  void removeRecentTrip(Map<String, dynamic> trip) {
+    settings.recentTrips.remove(trip);
+    settings.save();
+    notifyListeners();
+  }
+
+  void clearRecentTrips() {
+    settings.recentTrips.clear();
+    settings.save();
+    notifyListeners();
+  }
+
   void removeFavTrip(Map<String, dynamic> trip) {
     settings.favTrips.remove(trip);
     settings.save();

@@ -183,6 +183,7 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
       _searching = true;
       _error = null;
     });
+    app.addRecentTrip(_from!.toJson(), _to!.toJson());
     try {
       final n = app.now();
       final t = _time ?? TimeOfDay.fromDateTime(n);
@@ -384,6 +385,28 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
     });
   }
 
+  bool _allRecent = false;
+
+  /// « il y a 5 min », « il y a 2 h », « hier », « le 12/11 ».
+  static String _ago(String? iso) {
+    final t = DateTime.tryParse(iso ?? '');
+    if (t == null) return '';
+    final d = DateTime.now().difference(t);
+    if (d.inMinutes < 1) return 'à l\'instant';
+    if (d.inMinutes < 60) return 'il y a ${d.inMinutes} min';
+    if (d.inHours < 24) return 'il y a ${d.inHours} h';
+    if (d.inDays == 1) return 'hier';
+    return 'le ${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}';
+  }
+
+  bool _isFavTrip(Map t) => app.favTrips.any(
+    (f) =>
+        (f['from'] as Map)['ref'] == (t['from'] as Map)['ref'] &&
+        (f['to'] as Map)['ref'] == (t['to'] as Map)['ref'] &&
+        (f['from'] as Map)['kind'] == (t['from'] as Map)['kind'] &&
+        (f['to'] as Map)['kind'] == (t['to'] as Map)['kind'],
+  );
+
   List<(StopArea, double)>? _nearby;
   bool _locating = false;
   String? _nearbyError;
@@ -450,6 +473,56 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
               ),
             ),
           Text('Appui long sur un trajet pour le retirer.', style: t.bodySmall),
+          const SizedBox(height: 12),
+        ],
+        // recherches récentes (hors trajets favoris), les 3 dernières puis toutes sur demande
+        if ([
+              for (final r in app.recentTrips)
+                if (!_isFavTrip(r)) r,
+            ]
+            case final recent when recent.isNotEmpty) ...[
+          Row(
+            children: [
+              Expanded(child: Text('Recherches récentes', style: t.titleSmall)),
+              TextButton(onPressed: app.clearRecentTrips, child: const Text('Tout effacer')),
+            ],
+          ),
+          for (final r in _allRecent ? recent : recent.take(3))
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.history),
+              title: Row(
+                children: [
+                  Flexible(child: label(icon(r['from'] as Map))),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6),
+                    child: Icon(Icons.arrow_forward, size: 16),
+                  ),
+                  Flexible(child: label(icon(r['to'] as Map))),
+                ],
+              ),
+              subtitle: Text(_ago(r['at'] as String?)),
+              onTap: () => _useTrip(r),
+              onLongPress: () => app.removeRecentTrip(r),
+              trailing: IconButton(
+                tooltip: 'Ajouter aux trajets favoris',
+                icon: const Icon(Icons.star_border),
+                onPressed: () => app.saveFavTrip(
+                  Map<String, dynamic>.from(r['from'] as Map),
+                  Map<String, dynamic>.from(r['to'] as Map),
+                ),
+              ),
+            ),
+          if (recent.length > 3)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => setState(() => _allRecent = !_allRecent),
+                child: Text(_allRecent ? 'Voir moins' : 'Voir les ${recent.length}'),
+              ),
+            ),
+          Text('Appui long sur une recherche pour la retirer.', style: t.bodySmall),
           const SizedBox(height: 12),
         ],
         Row(
