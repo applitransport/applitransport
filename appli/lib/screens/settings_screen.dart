@@ -432,6 +432,52 @@ class _GeneralTab extends StatelessWidget {
   const _GeneralTab({required this.app});
   final AppState app;
 
+  /// Lieux d'Île-de-France (OpenStreetMap) : recherche des commerces, restaurants… sans connexion.
+  Widget _placesSection(BuildContext context) {
+    final p = app.places;
+    final m = p.meta;
+    String fmtDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Lieux d\'Île-de-France', style: Theme.of(context).textTheme.titleMedium),
+        const Text(
+          'Commerces, restaurants, santé, culture, loisirs… (OpenStreetMap) pour chercher une destination dans '
+          'Itinéraire, sans connexion et sans rien envoyer. Mis à jour chaque semaine.',
+        ),
+        const SizedBox(height: 8),
+        if (p.installed && m != null)
+          Text(
+            '${m['lieux']} lieux · ${((m['taille_base'] ?? 0) / 1e6).toStringAsFixed(0)} Mo sur l\'appareil'
+            '${p.date == null ? '' : ' · du ${fmtDate(p.date!.toLocal())}'}',
+          ),
+        if (app.placesBusy) ...[
+          const SizedBox(height: 8),
+          LinearProgressIndicator(value: app.placesProgress),
+          const Text('Téléchargement…'),
+        ] else
+          Wrap(
+            spacing: 8,
+            children: [
+              FilledButton.tonalIcon(
+                icon: Icon(p.installed ? Icons.refresh : Icons.download),
+                label: Text(p.installed ? 'Mettre à jour' : 'Télécharger (≈ 7 Mo)'),
+                onPressed: app.downloadPlaces,
+              ),
+              if (p.installed)
+                TextButton.icon(
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Supprimer'),
+                  onPressed: app.removePlaces,
+                ),
+            ],
+          ),
+        if (app.placesError != null)
+          Text(app.placesError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -480,6 +526,8 @@ class _GeneralTab extends StatelessWidget {
           onTest: app.testDataUrl,
         ),
         const SizedBox(height: 8),
+        const Divider(),
+        _placesSection(context),
         const Divider(),
         Text('Localisation', style: Theme.of(context).textTheme.titleMedium),
         SwitchListTile(

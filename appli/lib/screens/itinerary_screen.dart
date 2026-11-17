@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../data/geocoder.dart';
+import '../data/places_store.dart' show normalizeWords;
 import '../data/location.dart';
 import '../data/realtime.dart';
 import '../data/track.dart' show distanceMeters;
@@ -127,6 +128,15 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
     super.initState();
     _from = widget.from;
     _to = widget.to;
+    // dernière position connue du téléphone, si la localisation est déjà autorisée (pas de demande)
+    Geolocator.checkPermission()
+        .then((perm) async {
+          if (perm == LocationPermission.always || perm == LocationPermission.whileInUse) {
+            final p = await Geolocator.getLastKnownPosition();
+            if (p != null) _lastKnown = LatLng(p.latitude, p.longitude);
+          }
+        })
+        .catchError((_) {});
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
   }
 
@@ -230,6 +240,7 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
                   children: [
                     _PlaceField(
                       app: app,
+                      near: () => _quickPos(_to),
                       label: 'Départ',
                       icon: Icons.trip_origin,
                       value: _from,
@@ -241,6 +252,7 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
                     const SizedBox(height: 8),
                     _PlaceField(
                       app: app,
+                      near: () => _quickPos(_from),
                       label: 'Arrivée',
                       icon: Icons.flag,
                       value: _to,
@@ -305,6 +317,21 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
         ],
       ),
     );
+  }
+
+  /// Dernière position connue (sans demander de nouvelle mesure), pour classer les lieux.
+  LatLng? _lastKnown;
+
+  /// Coordonnées d'un lieu choisi sans attendre (arrêt, coordonnées), sinon ma dernière position.
+  LatLng? _quickPos(PlaceChoice? p) {
+    final ref = p?.ref ?? '';
+    if (ref.startsWith('stop_area:')) return app.stopAreas[ref.substring(10)]?.pos;
+    final parts = ref.split(';');
+    if (parts.length == 2) {
+      final lon = double.tryParse(parts[0]), lat = double.tryParse(parts[1]);
+      if (lon != null && lat != null) return LatLng(lat, lon);
+    }
+    return _lastKnown;
   }
 
   // --- aperçu avant recherche ---------------------------------------------------------
@@ -402,6 +429,7 @@ class _PlaceField extends StatefulWidget {
     required this.value,
     required this.onSet,
     this.initialText,
+    this.near,
   });
   final AppState app;
   final String label;
@@ -411,6 +439,9 @@ class _PlaceField extends StatefulWidget {
 
   /// Texte à chercher dès l'ouverture (saisi, champ actif, suggestions ouvertes).
   final String? initialText;
+
+  /// Point autour duquel classer les lieux trouvés (l'autre champ, ou ma dernière position).
+  final LatLng? Function()? near;
 
   @override
   State<_PlaceField> createState() => _PlaceFieldState();
@@ -458,10 +489,30 @@ class _PlaceFieldState extends State<_PlaceField> {
     _latest = q;
     await Future.delayed(const Duration(milliseconds: 450));
     if (_latest != q) return local;
-    // lieux et adresses (IGN) et entreprises (Sirene), en parallèle
-    final (places0, companies) = await (_geocoder.search(text.trim()), _geocoder.searchCompanies(text.trim())).wait;
-    final places = [...places0, ...companies];
+    // lieux OSM de l'appareil (sans connexion), puis IGN (lieux publics, adresses) et entreprises (Sirene)
+    // en parallèle ; sans réseau, on n'attend pas plus de 4 s
+    final osm = app.places.search(text, near: widget.near?.call(), limit: 4);
+    const none = <GeoPlace>[];
+    final (ign, companies) = await (
+      _geocoder.search(text.trim()).timeout(const Duration(seconds: 4), onTimeout: () => none),
+      _geocoder.searchCompanies(text.trim()).timeout(const Duration(seconds: 4), onTimeout: () => none),
+    ).wait;
     if (_latest != q) return local;
+    // une adresse (« 12 rue… ») : l'IGN d'abord ; sinon les lieux de l'appareil d'abord
+    final addressFirst = RegExp(r'^\s*\d').hasMatch(text);
+    final merged = <GeoPlace>[];
+    bool dup(GeoPlace g) => merged.any(
+      (m) =>
+          normalizeWords(m.name) == normalizeWords(g.name) && const Distance().as(LengthUnit.Meter, m.pos, g.pos) < 150,
+    );
+    final fromOsm = [for (final p in osm) GeoPlace(name: p.name, detail: p.detail, pos: p.pos, isPoi: true)];
+    for (final g in [
+      ...(addressFirst ? [...ign, ...fromOsm] : [...fromOsm, ...ign]),
+      ...companies,
+    ]) {
+      if (!dup(g)) merged.add(g);
+    }
+    final places = merged;
     if (places.isEmpty && RegExp(r'\d').hasMatch(q)) {
       // géocodeur indisponible : adresses du calculateur PRIM (une requête)
       final addresses = await app.searchAddresses(text.trim());

@@ -9,6 +9,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/community.dart';
 import '../data/package_decoder.dart';
+import '../data/places_store.dart';
 import '../data/paris_time.dart';
 import '../data/prim.dart';
 import '../data/realtime.dart';
@@ -25,6 +26,41 @@ class AppState extends ChangeNotifier {
     _readCatalog();
     prim = PrimClient(token: () => settings.token, usage: usage);
     community = CommunityClient(baseUrl: () => settings.communityUrl, installKey: _installKey, usage: usage);
+    places = PlacesStore(repo.dir, () => settings.dataUrl.endsWith('/') ? settings.dataUrl : '${settings.dataUrl}/');
+  }
+
+  /// Lieux d'Île-de-France (OpenStreetMap), téléchargés à la demande.
+  late final PlacesStore places;
+
+  /// Téléchargement des lieux en cours : progression de 0 à 1 (null : rien en cours).
+  double? placesProgress;
+  bool placesBusy = false;
+  String? placesError;
+
+  Future<void> downloadPlaces() async {
+    if (placesBusy) return;
+    placesBusy = true;
+    placesProgress = 0;
+    placesError = null;
+    notifyListeners();
+    try {
+      await places.download(
+        onProgress: (got, total) {
+          placesProgress = total == null || total == 0 ? null : got / total;
+          notifyListeners();
+        },
+      );
+    } catch (e) {
+      placesError = '$e';
+    }
+    placesProgress = null;
+    placesBusy = false;
+    notifyListeners();
+  }
+
+  Future<void> removePlaces() async {
+    await places.remove();
+    notifyListeners();
   }
 
   final Repository repo;
@@ -152,6 +188,11 @@ class AppState extends ChangeNotifier {
       if (lastError == null && repo.outdated.isNotEmpty) await updateAll();
     }
     await checkAppUpdate();
+    // lieux installés : nouvelle base chaque semaine
+    final d = places.date;
+    if (places.installed && (d == null || DateTime.now().difference(d).inDays >= 7) && await places.outdated()) {
+      await downloadPlaces();
+    }
   }
 
   // --- nouvelle version de l'appli (Releases GitHub) -------------------------------------
