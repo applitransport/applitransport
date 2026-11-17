@@ -1,12 +1,14 @@
 // Navigation à pied jusqu'à l'arrêt de montée (bouton « Partir » d'un itinéraire).
 // Moteur MapLibre et carte vectorielle OpenFreeMap : les noms de rue restent à l'endroit. L'appli
-// centre la carte sur l'usager et la tourne elle-même selon la boussole (lue directement, ~30 fois par
-// seconde, sans animation) : le suivi intégré de MapLibre lisse et anime trop, d'où une latence.
+// centre la carte sur l'usager et la tourne elle-même, comme Organic Maps : capteur « vecteur de
+// rotation » sans lissage, angle interpolé à chaque image de l'écran ; en marchant, la direction GPS
+// prime 3 s après chaque position. (Le suivi intégré de MapLibre lisse et anime trop : latence.)
 // Rien n'est envoyé : la position reste sur le téléphone.
 import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -124,15 +126,19 @@ class WalkNavScreen extends StatefulWidget {
   State<WalkNavScreen> createState() => _WalkNavScreenState();
 }
 
-class _WalkNavScreenState extends State<WalkNavScreen> {
+class _WalkNavScreenState extends State<WalkNavScreen> with SingleTickerProviderStateMixin {
   ml.MapLibreMapController? _map;
   bool _styleReady = false;
   StreamSubscription<Position>? _gps;
   StreamSubscription<CompassEvent>? _compass;
-  double? _heading; // cap lissé (degrés), null tant qu'il n'est pas connu
-  double? _gpsHeading; // direction de marche, si la boussole manque
+  double? _target; // dernier cap mesuré (degrés), null tant qu'il n'est pas connu
+  double? _shown; // cap affiché, qui rejoint _target image par image
+  DateTime _gpsBearingAt = DateTime(0); // dernière direction de marche GPS
+  late final Ticker _frames = createTicker(_onFrame);
+  Duration _lastFrame = Duration.zero;
+  bool _moving = false; // déplacement de caméra en cours (on n'en empile pas)
+  bool _dirty = false; // position changée : recentrer
   double _zoom = 17;
-  DateTime _lastMove = DateTime(0);
   Timer? _ticker;
   LatLng? _me;
   bool _follow = true; // carte qui suit l'usager
@@ -162,21 +168,22 @@ class _WalkNavScreenState extends State<WalkNavScreen> {
           locationSettings: const LocationSettings(accuracy: LocationAccuracy.best, distanceFilter: 2),
         ).listen((p) {
           _me = LatLng(p.latitude, p.longitude);
-          if (p.speed >= 0.8 && p.heading >= 0) _gpsHeading = p.heading;
-          // pas de boussole : direction de marche
-          if (FlutterCompass.events == null && _gpsHeading != null) _heading = _gpsHeading;
+          // en marchant (> 0,7 m/s ≈ 2,5 km/h), la direction de marche prime sur la boussole
+          if (p.speed > 0.7 && p.heading >= 0) {
+            _target = p.heading;
+            _gpsBearingAt = DateTime.now();
+          }
           _drawPath();
-          _moveCamera(force: true);
+          _dirty = true;
           if (mounted) setState(() {});
         }, onError: (e) => setState(() => _error = 'Localisation indisponible : $e'));
     _compass = FlutterCompass.events?.listen((e) {
       final raw = e.heading;
       if (raw == null) return;
-      final h = _heading;
-      // lissage léger : réactif sans trembler
-      _heading = h == null ? raw : (h + (((raw - h + 540) % 360) - 180) * 0.35 + 360) % 360;
-      _moveCamera();
+      if (DateTime.now().difference(_gpsBearingAt).inMilliseconds < 3000) return;
+      _target = (raw + 360) % 360; // capteur déjà stable : pas de lissage
     });
+    _frames.start();
   }
 
   @override
@@ -184,6 +191,7 @@ class _WalkNavScreenState extends State<WalkNavScreen> {
     WakelockPlus.disable();
     _gps?.cancel();
     _compass?.cancel();
+    _frames.dispose();
     _ticker?.cancel();
     super.dispose();
   }
@@ -261,22 +269,46 @@ class _WalkNavScreenState extends State<WalkNavScreen> {
     await m.setGeoJsonSource('chemin', _line(p.sublist(1)));
   }
 
-  /// Centre la carte sur l'usager et l'oriente (au plus ~30 fois par seconde, sans animation).
+  /// À chaque image : le cap affiché rejoint le cap mesuré (≈ 60 ms), puis la carte est recentrée et
+  /// tournée si quelque chose a changé.
+  void _onFrame(Duration now) {
+    final dt = (now - _lastFrame).inMicroseconds / 1e6;
+    _lastFrame = now;
+    final t = _target;
+    if (t != null) {
+      final s = _shown;
+      if (s == null) {
+        _shown = t;
+        _dirty = true;
+      } else {
+        final diff = ((t - s + 540) % 360) - 180;
+        if (diff.abs() > 0.05) {
+          _shown = (s + diff * (1 - math.exp(-dt.clamp(0, 0.1) / 0.06)) + 360) % 360;
+          _dirty = true;
+        }
+      }
+    }
+    if (_dirty) _moveCamera();
+  }
+
+  /// Centre la carte sur l'usager et l'oriente (sans animation : l'interpolation est faite par image).
   void _moveCamera({bool force = false}) {
     final m = _map, me = _me;
     if (m == null || me == null || !_follow) return;
-    final now = DateTime.now();
-    if (!force && now.difference(_lastMove).inMilliseconds < 33) return;
-    _lastMove = now;
-    m.moveCamera(
-      ml.CameraUpdate.newCameraPosition(
-        ml.CameraPosition(
-          target: ml.LatLng(me.latitude, me.longitude),
-          zoom: _zoom,
-          bearing: _headingUp ? (_heading ?? 0) : 0,
-        ),
-      ),
-    );
+    if (_moving && !force) return; // déplacement précédent pas encore appliqué
+    _dirty = false;
+    _moving = true;
+    m
+        .moveCamera(
+          ml.CameraUpdate.newCameraPosition(
+            ml.CameraPosition(
+              target: ml.LatLng(me.latitude, me.longitude),
+              zoom: _zoom,
+              bearing: _headingUp ? (_shown ?? 0) : 0,
+            ),
+          ),
+        )
+        .whenComplete(() => _moving = false);
   }
 
   @override
