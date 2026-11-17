@@ -148,7 +148,10 @@ class _TripScreenState extends State<TripScreen> {
     setState(() {
       _locating = false;
       if (me == null) {
-        if (ask) _nearbyError = 'Position indisponible : localisation désactivée ou refusée.';
+        if (ask) {
+          _nearbyError =
+              'Position introuvable : localisation désactivée ou refusée, ou pas de signal GPS (à l\'intérieur ?).';
+        }
       } else {
         _located = true;
         _nearby = nearbyAreas(_boardingAreas, me);

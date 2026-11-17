@@ -1,11 +1,13 @@
 // Navigation à pied jusqu'à l'arrêt de montée (bouton « Partir » d'un itinéraire).
-// Moteur MapLibre et carte vectorielle OpenFreeMap : la carte suit l'usager et s'oriente dans sa
-// direction (boussole, gérée par MapLibre), les noms de rue restent à l'endroit. Rien n'est envoyé :
-// la position reste sur le téléphone.
+// Moteur MapLibre et carte vectorielle OpenFreeMap : les noms de rue restent à l'endroit. L'appli
+// centre la carte sur l'usager et la tourne elle-même selon la boussole (lue directement, ~30 fois par
+// seconde, sans animation) : le suivi intégré de MapLibre lisse et anime trop, d'où une latence.
+// Rien n'est envoyé : la position reste sur le téléphone.
 import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' as ml;
@@ -126,6 +128,11 @@ class _WalkNavScreenState extends State<WalkNavScreen> {
   ml.MapLibreMapController? _map;
   bool _styleReady = false;
   StreamSubscription<Position>? _gps;
+  StreamSubscription<CompassEvent>? _compass;
+  double? _heading; // cap lissé (degrés), null tant qu'il n'est pas connu
+  double? _gpsHeading; // direction de marche, si la boussole manque
+  double _zoom = 17;
+  DateTime _lastMove = DateTime(0);
   Timer? _ticker;
   LatLng? _me;
   bool _follow = true; // carte qui suit l'usager
@@ -133,12 +140,6 @@ class _WalkNavScreenState extends State<WalkNavScreen> {
   String? _error;
 
   AppState get app => widget.app;
-
-  ml.MyLocationTrackingMode get _mode => !_follow
-      ? ml.MyLocationTrackingMode.none
-      : _headingUp
-      ? ml.MyLocationTrackingMode.trackingCompass
-      : ml.MyLocationTrackingMode.tracking;
 
   @override
   void initState() {
@@ -161,15 +162,28 @@ class _WalkNavScreenState extends State<WalkNavScreen> {
           locationSettings: const LocationSettings(accuracy: LocationAccuracy.best, distanceFilter: 2),
         ).listen((p) {
           _me = LatLng(p.latitude, p.longitude);
+          if (p.speed >= 0.8 && p.heading >= 0) _gpsHeading = p.heading;
+          // pas de boussole : direction de marche
+          if (FlutterCompass.events == null && _gpsHeading != null) _heading = _gpsHeading;
           _drawPath();
+          _moveCamera(force: true);
           if (mounted) setState(() {});
         }, onError: (e) => setState(() => _error = 'Localisation indisponible : $e'));
+    _compass = FlutterCompass.events?.listen((e) {
+      final raw = e.heading;
+      if (raw == null) return;
+      final h = _heading;
+      // lissage léger : réactif sans trembler
+      _heading = h == null ? raw : (h + (((raw - h + 540) % 360) - 180) * 0.35 + 360) % 360;
+      _moveCamera();
+    });
   }
 
   @override
   void dispose() {
     WakelockPlus.disable();
     _gps?.cancel();
+    _compass?.cancel();
     _ticker?.cancel();
     super.dispose();
   }
@@ -247,7 +261,23 @@ class _WalkNavScreenState extends State<WalkNavScreen> {
     await m.setGeoJsonSource('chemin', _line(p.sublist(1)));
   }
 
-  void _setMode() => _map?.updateMyLocationTrackingMode(_mode);
+  /// Centre la carte sur l'usager et l'oriente (au plus ~30 fois par seconde, sans animation).
+  void _moveCamera({bool force = false}) {
+    final m = _map, me = _me;
+    if (m == null || me == null || !_follow) return;
+    final now = DateTime.now();
+    if (!force && now.difference(_lastMove).inMilliseconds < 33) return;
+    _lastMove = now;
+    m.moveCamera(
+      ml.CameraUpdate.newCameraPosition(
+        ml.CameraPosition(
+          target: ml.LatLng(me.latitude, me.longitude),
+          zoom: _zoom,
+          bearing: _headingUp ? (_heading ?? 0) : 0,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -264,22 +294,28 @@ class _WalkNavScreenState extends State<WalkNavScreen> {
           Expanded(
             child: Stack(
               children: [
-                ml.MapLibreMap(
-                  styleString: 'https://tiles.openfreemap.org/styles/${dark ? 'dark' : 'liberty'}',
-                  initialCameraPosition: ml.CameraPosition(
-                    target: ml.LatLng(start.latitude, start.longitude),
-                    zoom: 17,
+                // l'usager touche la carte : elle ne le suit plus (bouton pour reprendre)
+                Listener(
+                  onPointerDown: (_) {
+                    if (_follow) setState(() => _follow = false);
+                  },
+                  child: ml.MapLibreMap(
+                    styleString: 'https://tiles.openfreemap.org/styles/${dark ? 'dark' : 'liberty'}',
+                    initialCameraPosition: ml.CameraPosition(
+                      target: ml.LatLng(start.latitude, start.longitude),
+                      zoom: 17,
+                    ),
+                    myLocationEnabled: true,
+                    myLocationRenderMode: ml.MyLocationRenderMode.normal,
+                    trackCameraPosition: true,
+                    compassEnabled: false,
+                    tiltGesturesEnabled: false,
+                    attributionButtonPosition: ml.AttributionButtonPosition.bottomLeft,
+                    onMapCreated: (c) => _map = c,
+                    onStyleLoadedCallback: _onStyle,
+                    // zoom choisi par l'usager : conservé quand la carte reprend le suivi
+                    onCameraIdle: () => _zoom = _map?.cameraPosition?.zoom ?? _zoom,
                   ),
-                  myLocationEnabled: true,
-                  myLocationTrackingMode: _mode,
-                  myLocationRenderMode: ml.MyLocationRenderMode.compass,
-                  compassEnabled: false,
-                  tiltGesturesEnabled: false,
-                  attributionButtonPosition: ml.AttributionButtonPosition.bottomLeft,
-                  onMapCreated: (c) => _map = c,
-                  onStyleLoadedCallback: _onStyle,
-                  // l'usager déplace la carte : elle ne le suit plus (bouton pour reprendre)
-                  onCameraTrackingDismissed: () => setState(() => _follow = false),
                 ),
                 Positioned(
                   right: 12,
@@ -295,8 +331,7 @@ class _WalkNavScreenState extends State<WalkNavScreen> {
                             _headingUp = !_headingUp;
                             _follow = true;
                           });
-                          if (!_headingUp) _map?.animateCamera(ml.CameraUpdate.bearingTo(0));
-                          _setMode();
+                          _moveCamera(force: true);
                         },
                         child: Icon(_headingUp ? Icons.explore : Icons.navigation),
                       ),
@@ -307,7 +342,7 @@ class _WalkNavScreenState extends State<WalkNavScreen> {
                           tooltip: 'Recentrer sur moi',
                           onPressed: () {
                             setState(() => _follow = true);
-                            _setMode();
+                            _moveCamera(force: true);
                           },
                           child: const Icon(Icons.my_location),
                         ),
