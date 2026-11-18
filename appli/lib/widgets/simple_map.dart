@@ -2,6 +2,7 @@
 // points et des repères étiquetés (« Départ », « Arrivée »…), cadrée sur ce qu'elle montre.
 // Sert au détail d'un trajet (Itinéraire) et à l'aperçu avant la recherche.
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:latlong2/latlong.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' as ml;
 
@@ -84,15 +85,18 @@ class _SimpleMapState extends State<SimpleMap> {
   Future<void> _update() async {
     final m = _map;
     if (m == null || !_ready) return;
-    await m.setGeoJsonSource('traits', _traces(false));
-    await m.setGeoJsonSource('tirets', _traces(true));
-    await m.setGeoJsonSource('points', _dots());
-    await m.setGeoJsonSource('reperes', _flags());
+    try {
+      await m.setGeoJsonSource('traits', _traces(false));
+      await m.setGeoJsonSource('tirets', _traces(true));
+      await m.setGeoJsonSource('points', _dots());
+      await m.setGeoJsonSource('reperes', _flags());
+    } on PlatformException catch (_) {} // carte déjà fermée
   }
 
   Future<void> _onStyle() async {
     final m = _map;
     if (m == null || !mounted) return;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     await m.addGeoJsonSource('traits', _traces(false));
     await m.addGeoJsonSource('tirets', _traces(true));
     await m.addGeoJsonSource('points', _dots());
@@ -107,13 +111,13 @@ class _SimpleMapState extends State<SimpleMap> {
         lineJoin: 'round',
       ),
     );
-    // tirets sur un liseré blanc, lisibles sur tous les fonds
+    // tirets sur un liseré (blanc, ou foncé en mode sombre), lisibles sur le fond
     await m.addLineLayer(
       'tirets',
       'tirets-lisere',
-      const ml.LineLayerProperties(
-        lineColor: '#FFFFFF',
-        lineWidth: [
+      ml.LineLayerProperties(
+        lineColor: dark ? '#14212B' : '#FFFFFF',
+        lineWidth: const [
           '+',
           ['get', 'w'],
           3,

@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:latlong2/latlong.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' as ml;
 
@@ -196,32 +197,6 @@ class _LineMapState extends State<LineMap> {
         circleStrokeWidth: 2,
       ),
     );
-    // « Votre arrêt », « Arrivée » : un repère et son étiquette
-    await m.addCircleLayer(
-      'reperes',
-      'reperes-point',
-      const ml.CircleLayerProperties(
-        circleRadius: 7,
-        circleColor: ['get', 'bg'],
-        circleStrokeColor: '#FFFFFF',
-        circleStrokeWidth: 2,
-      ),
-    );
-    await m.addSymbolLayer(
-      'reperes',
-      'reperes-texte',
-      const ml.SymbolLayerProperties(
-        textField: ['get', 'label'],
-        textFont: ['Noto Sans Bold'],
-        textSize: 12,
-        textColor: ['get', 'fg'],
-        textHaloColor: ['get', 'bg'],
-        textHaloWidth: 4,
-        textAnchor: 'bottom',
-        textOffset: [0, -0.9],
-        textAllowOverlap: true,
-      ),
-    );
     await m.addCircleLayer(
       'vehicules',
       'vehicules',
@@ -264,6 +239,32 @@ class _LineMapState extends State<LineMap> {
         ],
       );
     }
+    // « Votre arrêt », « Arrivée » : un repère et son étiquette
+    await m.addCircleLayer(
+      'reperes',
+      'reperes-point',
+      const ml.CircleLayerProperties(
+        circleRadius: 7,
+        circleColor: ['get', 'bg'],
+        circleStrokeColor: '#FFFFFF',
+        circleStrokeWidth: 2,
+      ),
+    );
+    await m.addSymbolLayer(
+      'reperes',
+      'reperes-texte',
+      const ml.SymbolLayerProperties(
+        textField: ['get', 'label'],
+        textFont: ['Noto Sans Bold'],
+        textSize: 12,
+        textColor: ['get', 'fg'],
+        textHaloColor: ['get', 'bg'],
+        textHaloWidth: 4,
+        textAnchor: 'bottom',
+        textOffset: [0, -0.9],
+        textAllowOverlap: true,
+      ),
+    );
     await m.addCircleLayer(
       'moi',
       'moi',
@@ -289,10 +290,13 @@ class _LineMapState extends State<LineMap> {
     final m = _map;
     if (m == null || !_ready || !mounted) return;
     final scheme = Theme.of(context).colorScheme;
-    await m.setGeoJsonSource('vehicules', _busGeo(scheme));
-    await m.setGeoJsonSource('alertes', _alertsGeo());
-    await m.setGeoJsonSource('reperes', _flagsGeo(scheme));
-    await m.setGeoJsonSource('moi', _meGeo());
+    // écran quitté entre-temps : la carte n'existe plus, la mise à jour est sans objet
+    try {
+      await m.setGeoJsonSource('vehicules', _busGeo(scheme));
+      await m.setGeoJsonSource('alertes', _alertsGeo());
+      await m.setGeoJsonSource('reperes', _flagsGeo(scheme));
+      await m.setGeoJsonSource('moi', _meGeo());
+    } on PlatformException catch (_) {}
   }
 
   /// Toucher un véhicule (zone de 44 px) : sa fiche.

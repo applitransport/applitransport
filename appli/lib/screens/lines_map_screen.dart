@@ -146,6 +146,7 @@ class _LinesMapScreenState extends State<LinesMapScreen> {
     if (m == null) return;
     final reach = _reach;
     final o = widget.origin.pos;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     await m.addGeoJsonSource('lignes', _linesGeo(reach));
     await m.addGeoJsonSource('arrets', _stopsGeo(reach));
     await m.addGeoJsonSource('terminus', _terminiGeo(reach));
@@ -186,12 +187,13 @@ class _LinesMapScreenState extends State<LinesMapScreen> {
     await m.addSymbolLayer(
       'terminus',
       'terminus',
-      const ml.SymbolLayerProperties(
-        textField: ['get', 'label'],
-        textFont: ['Noto Sans Bold'],
+      ml.SymbolLayerProperties(
+        textField: const ['get', 'label'],
+        textFont: const ['Noto Sans Bold'],
         textSize: 12,
-        textColor: '#14212B',
-        textHaloColor: '#FFFFFF',
+        // mode sombre : texte clair sur halo foncé
+        textColor: dark ? '#E8EEF2' : '#14212B',
+        textHaloColor: dark ? '#14212B' : '#FFFFFF',
         textHaloWidth: 2,
         textOffset: [0, 1.2],
         textAnchor: 'top',
@@ -200,9 +202,9 @@ class _LinesMapScreenState extends State<LinesMapScreen> {
     await m.addCircleLayer(
       'depart',
       'depart',
-      const ml.CircleLayerProperties(
+      ml.CircleLayerProperties(
         circleRadius: 9,
-        circleColor: '#0E5A73',
+        circleColor: dark ? '#5FB4D0' : '#0E5A73',
         circleStrokeColor: '#FFFFFF',
         circleStrokeWidth: 3,
       ),

@@ -8,6 +8,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter_compass/flutter_compass.dart';
 import '../data/geo.dart';
@@ -269,8 +270,10 @@ class _WalkNavScreenState extends State<WalkNavScreen> with SingleTickerProvider
     final m = _map;
     if (m == null || !_styleReady || _me == null) return;
     final p = _path;
-    await m.setGeoJsonSource('liaison', _line(p.sublist(0, math.min(2, p.length))));
-    await m.setGeoJsonSource('chemin', _line(p.sublist(1)));
+    try {
+      await m.setGeoJsonSource('liaison', _line(p.sublist(0, math.min(2, p.length))));
+      await m.setGeoJsonSource('chemin', _line(p.sublist(1)));
+    } on PlatformException catch (_) {} // écran quitté entre-temps
   }
 
   /// À chaque image : le cap affiché rejoint le cap mesuré (≈ 60 ms), puis la carte est recentrée et
