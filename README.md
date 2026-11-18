@@ -2,7 +2,7 @@
 
 Suivi des transports en commun d'Île-de-France sur téléphone : horaires hors ligne, position des
 véhicules, temps réel et perturbations, itinéraires, et un mode communauté (positions et signalements
-des voyageurs). Données Île-de-France Mobilités (licence ODbL). Site : https://applitransport.cypherlux.fr
+des voyageurs). Données Île-de-France Mobilités (Licence Mobilités). Site : https://applitransport.cypherlux.fr
 
 | Dossier | Rôle |
 |---|---|
@@ -32,5 +32,5 @@ python3 -m venv .venv && .venv/bin/pip install -r usine/requirements.txt
 
 ## Licence
 Code : [PolyForm Strict 1.0.0](LICENSE.md) — utilisation gratuite à des fins non commerciales, sans
-modification ni redistribution. Données : © Île-de-France Mobilités, ODbL ; carte : OpenFreeMap, © OpenMapTiles, © contributeurs OpenStreetMap.
+modification ni redistribution. Données : © Île-de-France Mobilités, Licence Mobilités ; carte : OpenFreeMap, © OpenMapTiles, © contributeurs OpenStreetMap.
 Détails et bibliothèques tierces : [NOTICE.md](NOTICE.md).

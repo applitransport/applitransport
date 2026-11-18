@@ -5,11 +5,13 @@
 **sans modification ni redistribution**.
 
 ## Données
-- **Horaires, arrêts, lignes, temps réel, perturbations, itinéraires** : © Île-de-France Mobilités,
-  [Open Database License (ODbL) 1.0](https://opendatacommons.org/licenses/odbl/1-0/).
+- **Horaires prévus** ([GTFS IDFM](https://data.iledefrance-mobilites.fr/explore/dataset/offre-horaires-tc-gtfs-idfm/)) et **API PRIM** (prochains passages, perturbations,
+  itinéraires) : © Île-de-France Mobilités, [Licence Mobilités](https://cloud.fabmob.io/s/eYWWJBdM3fQiFNm).
   Le catalogue et les paquets de lignes publiés par l'usine (GitHub Pages) sont une base de données
-  dérivée : ils restent sous **ODbL**, indépendamment de la licence du code.
-- **Communes des arrêts** : référentiel des arrêts © Île-de-France Mobilités, ODbL.
+  dérivée : ils restent sous **Licence Mobilités** (partage à l'identique), indépendamment de la licence
+  du code, qui ne s'applique pas aux données.
+- **Communes des arrêts** : [référentiel des arrêts](https://data.iledefrance-mobilites.fr/explore/dataset/arrets/) © Île-de-France Mobilités,
+  [Licence Ouverte 2.0](https://www.etalab.gouv.fr/licence-ouverte-open-licence/).
 - **Fond de carte** : vectoriel [OpenFreeMap](https://openfreemap.org/), © [OpenMapTiles](https://www.openmaptiles.org/),
   données © contributeurs [OpenStreetMap](https://www.openstreetmap.org/copyright), ODbL ; affiché par
   [MapLibre](https://maplibre.org/).

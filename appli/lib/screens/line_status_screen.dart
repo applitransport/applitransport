@@ -586,6 +586,13 @@ class _LineStatusScreenState extends State<LineStatusScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
             children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Indicatifs et non vérifiés : ils ne remplacent pas l\'information officielle.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
               if (!app.community.configured)
                 const Text('Renseignez l\'adresse du serveur communautaire dans Configuration › Général.')
               else if (cl == null)

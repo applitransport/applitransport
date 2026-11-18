@@ -17,8 +17,11 @@ Future<void> main() async {
     () => Stream.fromIterable([
       const LicenseEntryWithLineBreaks(
         ['Données Île-de-France Mobilités'],
-        'Horaires, arrêts, temps réel, perturbations et itinéraires © Île-de-France Mobilités, '
-        'Open Database License (ODbL) 1.0 : https://opendatacommons.org/licenses/odbl/1-0/',
+        'Contient des informations des horaires prévus d\'Île-de-France Mobilités (https://data.iledefrance-mobilites.fr/explore/dataset/offre-horaires-tc-gtfs-idfm/) '
+        'et de ses API temps réel, perturbations et itinéraires (PRIM, https://prim.iledefrance-mobilites.fr), '
+        'mises à disposition aux conditions de la « Licence Mobilités » (https://cloud.fabmob.io/s/eYWWJBdM3fQiFNm).\n\n'
+        'Communes des arrêts : référentiel des arrêts © Île-de-France Mobilités (https://data.iledefrance-mobilites.fr/explore/dataset/arrets/), '
+        'Licence Ouverte 2.0 (https://www.etalab.gouv.fr/licence-ouverte-open-licence/).',
       ),
       const LicenseEntryWithLineBreaks(
         ['Fond de carte OpenFreeMap'],

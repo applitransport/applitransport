@@ -593,7 +593,7 @@ class _GeneralTab extends StatelessWidget {
           'Licence PolyForm Strict 1.0.0 : utilisation gratuite à des fins non '
           'commerciales, sans modification ni redistribution. Copyright © 2026 Sébastien N.\n\n'
           '${app.catalog.length} lignes au catalogue, ${app.downloaded.length} téléchargée(s).\n'
-          'Données : © Île-de-France Mobilités, licence ODbL.\n'
+          'Données : © Île-de-France Mobilités, Licence Mobilités ; communes des arrêts : Licence Ouverte.\n'
           'Fond de carte : OpenFreeMap, © OpenMapTiles, © contributeurs OpenStreetMap.\n'
           'Lieux : © contributeurs OpenStreetMap. Adresses : © IGN. Entreprises : © INSEE (Sirene).',
         ),
@@ -605,7 +605,7 @@ class _GeneralTab extends StatelessWidget {
             onPressed: () => showLicensePage(
               context: context,
               applicationName: 'AppliTransport',
-              applicationLegalese: 'PolyForm Strict 1.0.0 · données Île-de-France Mobilités (ODbL)',
+              applicationLegalese: 'PolyForm Strict 1.0.0 · données Île-de-France Mobilités (Licence Mobilités)',
             ),
           ),
         ),

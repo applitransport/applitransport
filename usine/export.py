@@ -283,8 +283,8 @@ def export(db_file=DB_FILE, out_dir=PUBLIC_DIR, feed_info=None):
         areas.append(area)
 
     catalog = {"format": FORMAT, "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-               "license": {"name": "ODbL 1.0", "url": "https://opendatacommons.org/licenses/odbl/1-0/",
-                           "attribution": "Île-de-France Mobilités"},
+               "license": {"name": "Licence Mobilités", "url": "https://cloud.fabmob.io/s/eYWWJBdM3fQiFNm",
+                           "attribution": "Île-de-France Mobilités", "source": "https://data.iledefrance-mobilites.fr/explore/dataset/offre-horaires-tc-gtfs-idfm/"},
                "feed": feed_info or {},
                # bilan de la publication, lisible sans les journaux de GitHub Actions
                "publication": {"kept": kept, "republished": len(catalog_lines) - kept},
@@ -295,8 +295,12 @@ def export(db_file=DB_FILE, out_dir=PUBLIC_DIR, feed_info=None):
         old.unlink()
     write_gz(out_dir / "catalog.json.gz", catalog)
     (out_dir / "LICENCE.txt").write_text(
-        "Données : © Île-de-France Mobilités, Open Database License (ODbL) 1.0\n"
-        "https://opendatacommons.org/licenses/odbl/1-0/\n\n"
+        "Contient des informations des horaires prévus d'Île-de-France Mobilités\n"
+        "(https://data.iledefrance-mobilites.fr/explore/dataset/offre-horaires-tc-gtfs-idfm/),\n"
+        "mises à disposition aux conditions de la « Licence Mobilités » :\n"
+        "https://cloud.fabmob.io/s/eYWWJBdM3fQiFNm\n\n"
+        "Communes des arrêts : référentiel des arrêts © Île-de-France Mobilités\n"
+        "(https://data.iledefrance-mobilites.fr/explore/dataset/arrets/), Licence Ouverte 2.0 : https://www.etalab.gouv.fr/licence-ouverte-open-licence/\n\n"
         "Base de données dérivée (catalogue et paquets de lignes) produite par l'usine d'AppliTransport :\n"
         "https://github.com/applitransport/applitransport\n", encoding="utf-8")
     print(f"{len(catalog_lines)} paquets ({kept} inchangés, {len(catalog_lines) - kept} republiés) : "
