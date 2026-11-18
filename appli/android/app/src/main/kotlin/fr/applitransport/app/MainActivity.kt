@@ -64,6 +64,11 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         val messenger = flutterEngine.dartExecutor.binaryMessenger
 
+        // types de processeur du téléphone, du préféré au moins bon (choix de l'APK des mises à jour)
+        MethodChannel(messenger, "fr.applitransport/device").setMethodCallHandler { call, result ->
+            if (call.method == "abis") result.success(Build.SUPPORTED_ABIS.toList()) else result.notImplemented()
+        }
+
         MethodChannel(messenger, "fr.applitransport/location").setMethodCallHandler { call, result ->
             when (call.method) {
                 "checkPermission" -> result.success(permissionState())

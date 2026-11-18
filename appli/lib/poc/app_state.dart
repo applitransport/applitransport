@@ -4,11 +4,13 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/community.dart';
 import '../data/package_decoder.dart';
+import '../data/app_update.dart';
 import '../data/places_store.dart';
 import '../data/paris_time.dart';
 import '../data/prim.dart';
@@ -280,14 +282,23 @@ class AppState extends ChangeNotifier {
       final latest = (j['tag_name'] as String? ?? '').replaceFirst(RegExp('^v'), '');
       final installed = (await PackageInfo.fromPlatform()).version;
       if (!isNewerVersion(latest, installed)) return;
-      final apk = [
+      final apk = pickApk([
         for (final a in (j['assets'] ?? const []) as List)
-          if ((a['name'] as String).endsWith('.apk')) a['browser_download_url'] as String,
-      ].firstOrNull;
+          if ((a['name'] as String).endsWith('.apk')) (a['name'] as String, a['browser_download_url'] as String),
+      ], await deviceAbis());
       appUpdate = (version: latest, url: apk ?? j['html_url'] as String);
       notifyListeners();
     } catch (_) {
       // pas de réseau ou réponse inattendue : on réessaiera à la prochaine ouverture
+    }
+  }
+
+  /// Types de processeur du téléphone (« arm64-v8a », « armeabi-v7a »…), du préféré au moins bon.
+  static Future<List<String>> deviceAbis() async {
+    try {
+      return (await const MethodChannel('fr.applitransport/device').invokeListMethod<String>('abis')) ?? const [];
+    } catch (_) {
+      return const [];
     }
   }
 
