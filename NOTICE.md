@@ -10,9 +10,11 @@
   Le catalogue et les paquets de lignes publiés par l'usine (GitHub Pages) sont une base de données
   dérivée : ils restent sous **ODbL**, indépendamment de la licence du code.
 - **Communes des arrêts** : référentiel des arrêts © Île-de-France Mobilités, ODbL.
-- **Fond de carte** : © contributeurs [OpenStreetMap](https://www.openstreetmap.org/copyright), ODbL ;
-  tuiles servies par tile.openstreetmap.org (usage soumis à sa
-  [politique d'utilisation](https://operations.osmfoundation.org/policies/tiles/)).
+- **Fond de carte** : vectoriel [OpenFreeMap](https://openfreemap.org/), © [OpenMapTiles](https://www.openmaptiles.org/),
+  données © contributeurs [OpenStreetMap](https://www.openstreetmap.org/copyright), ODbL ; affiché par
+  [MapLibre](https://maplibre.org/).
+- **Lieux** (commerces, équipements…) : © contributeurs OpenStreetMap, ODbL ; **adresses et lieux-dits** :
+  © IGN (Géoplateforme) ; **entreprises** : © INSEE, base Sirene (API Recherche d'entreprises).
 
 ## Bibliothèques tierces
 Chaque bibliothèque reste sous sa propre licence (toutes permissives) ; l'appli les liste dans
@@ -21,8 +23,8 @@ Configuration › Général › Licences.
 | Bibliothèque | Licence |
 |---|---|
 | Flutter, http, path_provider | BSD 3 clauses |
-| flutter_map | BSD 3 clauses |
+| maplibre_gl | BSD 3 clauses (MapLibre Native : BSD 2 clauses) |
 | latlong2 | Apache 2.0 |
-| geolocator, cupertino_icons | MIT |
+| cupertino_icons | MIT |
 | httpx (usine) | BSD 3 clauses |
 | FastAPI (MIT), uvicorn (BSD), Leaflet (BSD 2 clauses) | POC web |

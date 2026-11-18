@@ -165,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           _tiles(context),
                           const SizedBox(height: 10),
                           Text(
-                            'Données © Île-de-France Mobilités · carte © OpenStreetMap · lieux et adresses © IGN · '
+                            'Données © Île-de-France Mobilités · carte OpenFreeMap © OpenMapTiles © OpenStreetMap · lieux et adresses © IGN · '
                             'entreprises © INSEE (Sirene)',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),

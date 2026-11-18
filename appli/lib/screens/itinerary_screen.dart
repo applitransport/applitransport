@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart'
     show CupertinoDatePicker, CupertinoDatePickerMode, CupertinoTheme, CupertinoThemeData, CupertinoTextThemeData;
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import '../data/geo.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -24,6 +23,7 @@ import '../poc/nearby.dart';
 import '../poc/position.dart';
 import '../widgets/line_badge.dart';
 import '../widgets/place_preview.dart';
+import '../widgets/simple_map.dart';
 import '../widgets/refresh_controls.dart';
 import 'line_screen.dart';
 import 'walk_nav_screen.dart';
@@ -1367,78 +1367,26 @@ class _DetailScreen extends StatelessWidget {
   }
 
   Widget _map(BuildContext context, Journey j) {
-    final all = [for (final s in j.sections) ...s.shape];
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final first = j.sections.first.from, last = j.sections.last.to;
-    return FlutterMap(
-      options: MapOptions(
-        initialCameraFit: all.length >= 2
-            ? CameraFit.bounds(bounds: LatLngBounds.fromPoints(all), padding: const EdgeInsets.all(28))
-            : null,
-        initialCenter: all.isNotEmpty ? all.first : const LatLng(48.85, 2.35),
-        interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'fr.applitransport.app',
-          tileBuilder: dark ? darkModeTileBuilder : null,
-        ),
-        PolylineLayer(
-          polylines: [
-            for (final s in j.sections)
-              if (s.shape.length >= 2)
-                s.isTransit
-                    ? Polyline(points: s.shape, color: s.color, strokeWidth: 5)
-                    // marche : pointillés bleus cerclés de blanc, lisibles sur le fond de carte
-                    : Polyline(
-                        points: s.shape,
-                        color: Colors.blue.shade700,
-                        strokeWidth: 5,
-                        borderColor: Colors.white,
-                        borderStrokeWidth: 1.5,
-                        pattern: const StrokePattern.dotted(spacingFactor: 1.6),
-                      ),
-          ],
-        ),
-        CircleLayer(
-          circles: [
-            for (final s in j.transit) ...[
-              if (s.from != null)
-                CircleMarker(
-                  point: s.from!.pos,
-                  radius: 6,
-                  color: Colors.white,
-                  borderColor: s.color,
-                  borderStrokeWidth: 3,
-                ),
-              if (s.to != null)
-                CircleMarker(
-                  point: s.to!.pos,
-                  radius: 6,
-                  color: Colors.white,
-                  borderColor: s.color,
-                  borderStrokeWidth: 3,
-                ),
-            ],
-          ],
-        ),
-        MarkerLayer(
-          markers: [
-            if (first != null)
-              Marker(
-                point: first.pos,
-                child: const Icon(Icons.trip_origin, color: Colors.green, size: 22),
-              ),
-            if (last != null)
-              Marker(
-                point: last.pos,
-                alignment: Alignment.topCenter,
-                child: const Icon(Icons.flag, color: Colors.red, size: 28),
-              ),
-          ],
-        ),
-        const RichAttributionWidget(attributions: [TextSourceAttribution('OpenStreetMap contributors')]),
+    return SimpleMap(
+      key: ObjectKey(j),
+      traces: [
+        for (final s in j.sections)
+          if (s.shape.length >= 2)
+            s.isTransit
+                ? MapTrace(s.shape, color: s.color)
+                // marche : tirets bleus cerclés de blanc
+                : MapTrace(s.shape, color: Colors.blue.shade700, width: 4, dashed: true),
+      ],
+      dots: [
+        for (final s in j.transit) ...[
+          if (s.from != null) MapDot(s.from!.pos, color: Colors.white, stroke: s.color, strokeWidth: 3),
+          if (s.to != null) MapDot(s.to!.pos, color: Colors.white, stroke: s.color, strokeWidth: 3),
+        ],
+      ],
+      flags: [
+        if (first != null) MapFlag(first.pos, 'Départ', background: Colors.green.shade700),
+        if (last != null) MapFlag(last.pos, 'Arrivée', background: Colors.red.shade700),
       ],
     );
   }

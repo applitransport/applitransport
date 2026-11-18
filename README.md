@@ -32,5 +32,5 @@ python3 -m venv .venv && .venv/bin/pip install -r usine/requirements.txt
 
 ## Licence
 Code : [PolyForm Strict 1.0.0](LICENSE.md) — utilisation gratuite à des fins non commerciales, sans
-modification ni redistribution. Données : © Île-de-France Mobilités, ODbL ; carte : © OpenStreetMap.
+modification ni redistribution. Données : © Île-de-France Mobilités, ODbL ; carte : OpenFreeMap, © OpenMapTiles, © contributeurs OpenStreetMap.
 Détails et bibliothèques tierces : [NOTICE.md](NOTICE.md).

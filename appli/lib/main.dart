@@ -20,9 +20,16 @@ Future<void> main() async {
         'Horaires, arrêts, temps réel, perturbations et itinéraires © Île-de-France Mobilités, '
         'Open Database License (ODbL) 1.0 : https://opendatacommons.org/licenses/odbl/1-0/',
       ),
-      const LicenseEntryWithLineBreaks([
-        'Carte OpenStreetMap',
-      ], '© contributeurs OpenStreetMap, ODbL : https://www.openstreetmap.org/copyright'),
+      const LicenseEntryWithLineBreaks(
+        ['Fond de carte OpenFreeMap'],
+        'Fond de carte vectoriel OpenFreeMap (https://openfreemap.org), © OpenMapTiles, données © contributeurs '
+        'OpenStreetMap, ODbL : https://www.openstreetmap.org/copyright',
+      ),
+      const LicenseEntryWithLineBreaks(
+        ['Lieux, adresses et entreprises'],
+        'Lieux © contributeurs OpenStreetMap, ODbL. Adresses © IGN (Géoplateforme). '
+        'Entreprises © INSEE, base Sirene (API Recherche d\'entreprises).',
+      ),
     ]),
   );
   // données conservées sur l'appareil (Linux : ~/.local/share/fr.applitransport.app)
