@@ -1,5 +1,5 @@
 // Choix de l'APK d'une nouvelle version selon le processeur du téléphone. Chaque Release publie un APK
-// par type de processeur : « applitransport-1.4.0-arm64.apk » (64 bits) et « …-arm32.apk » (32 bits).
+// par type de processeur : « applitransport-1.4.0-arm64.apk » (64 bits) et « …-vieux-arm32.apk » (32 bits).
 
 /// Suffixe du nom de fichier pour chaque type de processeur Android.
 const apkSuffixes = {'arm64-v8a': '-arm64.apk', 'armeabi-v7a': '-arm32.apk'};

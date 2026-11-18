@@ -20,11 +20,12 @@ unset PASS
 unset APPLI_KEYSTORE_PASSWORD APPLI_KEY_PASSWORD
 
 # copies nommées avec la version (pubspec.yaml), prêtes à joindre à une Release GitHub,
-# dans cet ordre : arm64 d'abord (les versions 1.3.0 et antérieures prennent le premier APK joint)
+# GitHub les liste par ordre alphabétique et les versions 1.3.0 et antérieures prennent le premier APK :
+# « …-arm64.apk » doit passer avant « …-vieux-arm32.apk » (le nom doit finir par -arm32.apk, cf. app_update.dart)
 VERSION=$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)
 OUT=build/app/outputs/flutter-apk
-declare -A ABI=([arm64]=arm64-v8a [arm32]=armeabi-v7a)
-for k in arm64 arm32; do
+declare -A ABI=([arm64]=arm64-v8a [vieux-arm32]=armeabi-v7a)
+for k in arm64 vieux-arm32; do
   APK=$OUT/applitransport-$VERSION-$k.apk
   cp "$OUT/app-${ABI[$k]}-release.apk" "$APK"
   echo "✓ APK signé : $APK ($(du -h "$APK" | cut -f1))"
@@ -34,7 +35,7 @@ done
 if "$ADB" get-state >/dev/null 2>&1; then
   # l'APK qui correspond au processeur du téléphone branché
   CPU=$("$ADB" shell getprop ro.product.cpu.abi | tr -d '\r')
-  K=arm32; [ "$CPU" = arm64-v8a ] && K=arm64
+  K=vieux-arm32; [ "$CPU" = arm64-v8a ] && K=arm64
   "$ADB" install -r "$OUT/applitransport-$VERSION-$K.apk" && echo "✓ installé sur le téléphone ($K)"
 else
   echo "Aucun téléphone détecté : branchez-le (débogage USB) puis : $ADB install -r $OUT/applitransport-$VERSION-arm64.apk"

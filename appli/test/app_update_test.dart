@@ -2,7 +2,7 @@ import 'package:applitransport/data/app_update.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const split = [('applitransport-1.4.0-arm64.apk', 'u64'), ('applitransport-1.4.0-arm32.apk', 'u32')];
+  const split = [('applitransport-1.4.0-arm64.apk', 'u64'), ('applitransport-1.4.0-vieux-arm32.apk', 'u32')];
 
   test('téléphone 64 bits : APK arm64', () {
     expect(pickApk(split, ['arm64-v8a', 'armeabi-v7a', 'armeabi']), 'u64');
