@@ -287,8 +287,8 @@ class AppState extends ChangeNotifier {
   static const _updateChannel = MethodChannel('fr.applitransport/update');
   bool _updateHandler = false;
 
-  /// Télécharge, vérifie et installe la nouvelle version par l'appli elle-même (Android : confirmation,
-  /// sauf Android 12+ quand l'appli s'est déjà mise à jour seule). Sans APK : page de la Release.
+  /// Télécharge, vérifie et installe la nouvelle version par l'appli elle-même (Android demande une
+  /// confirmation). Sans APK : page de la Release.
   Future<bool> installUpdate() async {
     final u = appUpdate;
     if (u == null || !u.apk) return false;
