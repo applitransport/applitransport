@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show MethodChannel;
 import 'package:http/http.dart' as http;
@@ -266,7 +267,11 @@ class AppState extends ChangeNotifier {
   }
 
   // --- nouvelle version de l'appli (Releases GitHub) -------------------------------------
-  static const releasesApi = 'https://api.github.com/repos/applitransport/applitransport/releases/latest';
+  /// Dernière Release GitHub. Version de debug seulement : `--dart-define=UPDATE_API=…` pour tester la mise
+  /// à jour avec une Release factice servie sur le PC (`adb reverse`).
+  static const releasesApi = kDebugMode && String.fromEnvironment('UPDATE_API') != ''
+      ? String.fromEnvironment('UPDATE_API')
+      : 'https://api.github.com/repos/applitransport/applitransport/releases/latest';
 
   /// Dernière version publiée, si elle est plus récente que celle installée.
   ///  [url] : l'APK du processeur du téléphone (ou la page de la Release) ; [sha256] : son empreinte

@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <!-- mise à jour de l'appli par elle-même (APK de la Release GitHub, empreinte vérifiée) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <!-- Android 12+ : mise à jour sans écran de confirmation quand l'appli s'est installée elle-même -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION"/>
     <application
         android:label="AppliTransport"
         android:name="${applicationName}"

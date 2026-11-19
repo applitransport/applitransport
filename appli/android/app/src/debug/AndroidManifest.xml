@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- version de debug : Release factice servie en http sur le PC (test de la mise à jour par l'appli) -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>
