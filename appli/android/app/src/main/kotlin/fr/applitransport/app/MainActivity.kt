@@ -25,6 +25,7 @@ class MainActivity : FlutterActivity() {
     private val requestCode = 4210
     private var pendingPermission: MethodChannel.Result? = null
     private val main = Handler(Looper.getMainLooper())
+    private var updater: UpdateInstaller? = null
 
     private val lm: LocationManager
         get() = getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -63,6 +64,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val messenger = flutterEngine.dartExecutor.binaryMessenger
+        updater = UpdateInstaller(this, messenger)
 
         // types de processeur du téléphone, du préféré au moins bon (choix de l'APK des mises à jour)
         MethodChannel(messenger, "fr.applitransport/device").setMethodCallHandler { call, result ->
@@ -165,6 +167,11 @@ class MainActivity : FlutterActivity() {
                 result.error("timeout", "pas de position", null)
             }
         }, 60_000)
+    }
+
+    override fun onDestroy() {
+        updater?.dispose()
+        super.onDestroy()
     }
 
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {

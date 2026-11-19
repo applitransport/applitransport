@@ -269,7 +269,53 @@ class AppState extends ChangeNotifier {
   static const releasesApi = 'https://api.github.com/repos/applitransport/applitransport/releases/latest';
 
   /// Dernière version publiée, si elle est plus récente que celle installée.
-  ({String version, String url})? appUpdate;
+  ///  [url] : l'APK du processeur du téléphone (ou la page de la Release) ; [sha256] : son empreinte
+  /// publiée par GitHub ; [page] : la page de la Release.
+  ({String version, String url, String? sha256, bool apk, String page})? appUpdate;
+
+  /// Installation en cours : avancement du téléchargement (0..1), ou null.
+  double? updateProgress;
+
+  /// Dernier échec de l'installation, ou message (« autorisez… »).
+  String? updateMessage;
+
+  static const _updateChannel = MethodChannel('fr.applitransport/update');
+  bool _updateHandler = false;
+
+  /// Télécharge, vérifie et installe la nouvelle version par l'appli elle-même (Android : confirmation,
+  /// sauf Android 12+ quand l'appli s'est déjà mise à jour seule). Sans APK : page de la Release.
+  Future<bool> installUpdate() async {
+    final u = appUpdate;
+    if (u == null || !u.apk) return false;
+    if (!_updateHandler) {
+      _updateHandler = true;
+      _updateChannel.setMethodCallHandler((call) async {
+        switch (call.method) {
+          case 'progress':
+            updateProgress = (call.arguments as num).toDouble();
+          case 'done':
+            updateProgress = null;
+            updateMessage = call.arguments == null ? null : 'Mise à jour impossible : ${call.arguments}';
+        }
+        notifyListeners();
+      });
+    }
+    try {
+      final r = await _updateChannel.invokeMethod<String>('install', {'url': u.url, 'sha256': u.sha256});
+      if (r == 'permission') {
+        updateMessage = 'Autorisez AppliTransport à installer des applications, puis revenez appuyer sur Installer.';
+      } else {
+        updateMessage = null;
+        updateProgress = 0;
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      updateMessage = 'Mise à jour impossible : $e';
+      notifyListeners();
+      return false;
+    }
+  }
 
   /// Lit la dernière Release : version (tag « v1.1.0 ») et lien de l'APK joint. Silencieux sans réseau.
   Future<void> checkAppUpdate() async {
@@ -284,9 +330,18 @@ class AppState extends ChangeNotifier {
       if (!isNewerVersion(latest, installed)) return;
       final apk = pickApk([
         for (final a in (j['assets'] ?? const []) as List)
-          if ((a['name'] as String).endsWith('.apk')) (a['name'] as String, a['browser_download_url'] as String),
+          if ((a['name'] as String).endsWith('.apk'))
+            (
+              a['name'] as String,
+              (
+                url: a['browser_download_url'] as String,
+                // « sha256:… » fourni par GitHub pour chaque fichier joint
+                sha256: (a['digest'] as String?)?.replaceFirst('sha256:', ''),
+              ),
+            ),
       ], await deviceAbis());
-      appUpdate = (version: latest, url: apk ?? j['html_url'] as String);
+      final page = j['html_url'] as String;
+      appUpdate = (version: latest, url: apk?.url ?? page, sha256: apk?.sha256, apk: apk != null, page: page);
       notifyListeners();
     } catch (_) {
       // pas de réseau ou réponse inattendue : on réessaiera à la prochaine ouverture

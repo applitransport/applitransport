@@ -4,10 +4,10 @@
 /// Suffixe du nom de fichier pour chaque type de processeur Android.
 const apkSuffixes = {'arm64-v8a': '-arm64.apk', 'armeabi-v7a': '-arm32.apk'};
 
-/// Lien de l'APK qui convient à [abis] (types de processeur du téléphone, du préféré au moins bon),
-/// parmi [apks] (nom, lien). Ancienne Release avec un seul APK universel : celui-là. Sinon null
-/// (l'appli ouvre alors la page de la Release).
-String? pickApk(List<(String, String)> apks, List<String> abis) {
+/// L'APK qui convient à [abis] (types de processeur du téléphone, du préféré au moins bon), parmi
+/// [apks] (nom, valeur : lien, empreinte…). Ancienne Release avec un seul APK universel : celui-là.
+/// Sinon null (l'appli ouvre alors la page de la Release).
+T? pickApk<T>(List<(String, T)> apks, List<String> abis) {
   for (final abi in abis) {
     final suffix = apkSuffixes[abi];
     if (suffix == null) continue;

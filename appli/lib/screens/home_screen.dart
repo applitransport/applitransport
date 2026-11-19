@@ -116,20 +116,58 @@ class _HomeScreenState extends State<HomeScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 2)));
   }
 
-  /// Nouvelle version publiée sur GitHub : lien vers l'APK, installé par-dessus (même signature).
-  Widget _updateBanner(BuildContext context) => Card(
-    color: Theme.of(context).colorScheme.primaryContainer,
-    margin: const EdgeInsets.only(bottom: 16),
-    child: ListTile(
-      leading: const Icon(Icons.system_update),
-      title: Text('Nouvelle version ${app.appUpdate!.version} disponible'),
-      subtitle: const Text('Téléchargez-la puis ouvrez le fichier pour mettre à jour l\'appli.'),
-      trailing: FilledButton(
-        onPressed: () => launchUrl(Uri.parse(app.appUpdate!.url), mode: LaunchMode.externalApplication),
-        child: const Text('Télécharger'),
+  /// Nouvelle version publiée sur GitHub : l'appli la télécharge, vérifie son empreinte et l'installe
+  /// (même signature). Sans APK pour ce téléphone, ou en cas d'échec : la page de la Release.
+  Widget _updateBanner(BuildContext context) {
+    final u = app.appUpdate!;
+    final p = app.updateProgress;
+    final msg = app.updateMessage;
+    void page() => launchUrl(Uri.parse(u.page), mode: LaunchMode.externalApplication);
+    return Card(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.system_update),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Nouvelle version ${u.version} disponible',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (p == null)
+                  FilledButton(
+                    onPressed: u.apk ? app.installUpdate : page,
+                    child: Text(u.apk ? 'Installer' : 'Télécharger'),
+                  ),
+              ],
+            ),
+            if (p != null) ...[
+              const SizedBox(height: 10),
+              LinearProgressIndicator(value: p >= 1 ? null : p),
+              const SizedBox(height: 6),
+              Text(
+                p >= 1 ? 'Installation…' : 'Téléchargement ${(p * 100).round()} %',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (msg != null) ...[
+              const SizedBox(height: 8),
+              Text(msg, style: Theme.of(context).textTheme.bodySmall),
+              if (msg.startsWith('Mise à jour impossible'))
+                TextButton(onPressed: page, child: const Text('Ouvrir la page de la version')),
+            ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
