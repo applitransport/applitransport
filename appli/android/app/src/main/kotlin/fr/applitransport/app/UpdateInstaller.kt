@@ -21,9 +21,9 @@ import java.security.MessageDigest
 
 /**
  * Mise à jour de l'appli par elle-même, sans services Google : télécharge l'APK de la Release, vérifie son
- * SHA-256, puis l'installe avec le module d'installation d'Android (PackageInstaller). Android demande une
- * confirmation, sauf (Android 12+) quand l'appli s'est déjà installée elle-même : la mise à jour se fait
- * alors sans écran. Canal « fr.applitransport/update » :
+ * SHA-256, puis l'installe avec le module d'installation d'Android (PackageInstaller), qui demande une
+ * confirmation (pas de mise à jour sans écran : sa permission fait bloquer l'APK par Play Protect, cf.
+ * AndroidManifest.xml). Canal « fr.applitransport/update » :
  *  - Dart → Android : « install » {url, sha256} → « started », « permission » (réglage ouvert) ;
  *  - Android → Dart : « progress » (0..1), « done » (null si réussi, sinon le message d'erreur).
  */
@@ -133,10 +133,6 @@ class UpdateInstaller(private val activity: Activity, messenger: BinaryMessenger
         val installer = activity.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
         params.setAppPackageName(activity.packageName)
-        // Android 12+ : pas de confirmation si l'appli est déjà sa propre « source d'installation »
-        if (Build.VERSION.SDK_INT >= 31) {
-            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
-        }
         val id = installer.createSession(params)
         installer.openSession(id).use { session ->
             session.openWrite("applitransport.apk", 0, apk.length()).use { out ->
