@@ -8,6 +8,7 @@ import '../data/traffic.dart';
 import 'data.dart';
 
 class Place {
+  const Place(this.name, this.pos, {this.area = ''});
   Place.fromNavitia(Map<String, dynamic> p)
     : name = p['name'] ?? '',
       pos = _coord(p[p['embedded_type']]?['coord']),
@@ -37,6 +38,7 @@ class Section {
             'waiting': 'wait',
           }[s['type']] ??
           s['type'],
+      crowFly = s['type'] == 'crow_fly',
       duration = s['duration'] ?? 0,
       dep = _sec(s['departure_date_time'], day),
       arr = _sec(s['arrival_date_time'], day),
@@ -66,14 +68,38 @@ class Section {
           if (l['type'] == 'disruption') l['id'] as String,
       ];
 
+  /// Marche jusqu'à [to] depuis [from] (derniers mètres vers un lieu, tracé IGN ou trait direct).
+  Section.walk(
+    Place this.from,
+    Place this.to,
+    this.shape, {
+    required this.dep,
+    required this.duration,
+    this.crowFly = false,
+  }) : type = 'walk',
+       arr = dep + duration,
+       baseDep = dep,
+       lineCode = null,
+       lineId = null,
+       mode = null,
+       direction = null,
+       color = Colors.blue,
+       textColor = Colors.white,
+       stops = const [],
+       disruptions = const [];
+
   /// « pt » (transport), « walk », « transfer » (marche de correspondance) ou « wait ».
   final String type;
   final int duration, dep, arr;
 
+  /// Tronçon sans chemin connu (« à vol d'oiseau ») : le calculateur n'a pas su rattacher un point aux
+  /// rues. Remplacé si possible par un chemin à pied de l'IGN (le tracé change, [crowFly] passe à false).
+  bool crowFly;
+
   /// Départ prévu (horaire théorique) : sert à retrouver la course dans le temps réel.
   final int baseDep;
   final Place? from, to;
-  final List<LatLng> shape;
+  List<LatLng> shape;
   final String? lineCode, lineId, mode, direction;
   final Color color, textColor;
   final List<String> stops, disruptions;
@@ -91,10 +117,14 @@ class Journey {
           // liaisons « à vol d'oiseau » de 0 min (arrêt = point d'arrivée) : sans intérêt
           if (!(s['type'] == 'crow_fly' && (s['duration'] ?? 0) == 0)) Section.fromNavitia(s, day),
       ];
-  final int dep, arr, transfers;
+  final int transfers;
+  int dep, arr;
   final List<Section> sections;
 
   Iterable<Section> get transit => sections.where((s) => s.isTransit);
+
+  /// Uniquement de la marche « à vol d'oiseau » : le calculateur n'a trouvé aucun chemin.
+  bool get onlyCrowFly => sections.isNotEmpty && sections.every((s) => s.crowFly || s.type == 'wait');
 }
 
 class ItinerarySearch {

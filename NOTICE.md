@@ -15,7 +15,7 @@
 - **Fond de carte** : vectoriel [OpenFreeMap](https://openfreemap.org/), © [OpenMapTiles](https://www.openmaptiles.org/),
   données © contributeurs [OpenStreetMap](https://www.openstreetmap.org/copyright), ODbL ; affiché par
   [MapLibre](https://maplibre.org/).
-- **Lieux** (commerces, équipements…) : © contributeurs OpenStreetMap, ODbL ; **adresses et lieux-dits** :
+- **Lieux** (commerces, équipements…) : © contributeurs OpenStreetMap, ODbL ; **adresses, lieux-dits et chemins à pied** :
   © IGN (Géoplateforme) ; **entreprises** : © INSEE, base Sirene (API Recherche d'entreprises).
 
 ## Bibliothèques tierces

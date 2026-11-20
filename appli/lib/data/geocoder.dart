@@ -1,6 +1,7 @@
 // Recherche de lieux et d'adresses : service d'autocomplétion de la Géoplateforme de l'IGN (lieux
 // publics, adresses) et API Recherche d'entreprises de l'État (bureaux, sociétés : base Sirene).
-// Publics, gratuits, sans clé. Seul le texte tapé est envoyé, jamais la position de l'usager.
+// Publics, gratuits, sans clé. Seul le texte tapé est envoyé, jamais la position de l'usager (les chemins
+// à pied de l'IGN, eux, reçoivent les deux points d'un tronçon : voir walk_router.dart).
 // Recherche limitée à l'Île-de-France.
 import 'dart:convert';
 

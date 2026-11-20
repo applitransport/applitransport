@@ -7,11 +7,14 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show MethodChannel;
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/community.dart';
 import '../data/package_decoder.dart';
 import '../data/app_update.dart';
+import '../data/track.dart' show distanceMeters;
+import '../data/walk_router.dart';
 import '../data/places_store.dart';
 import '../data/paris_time.dart';
 import '../data/prim.dart';
@@ -708,14 +711,105 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Itinéraires (1 requête « calculateur »).
-  Future<ItinerarySearch> searchJourneys(String from, String to, DateTime when, {bool arrival = false}) async {
+  /// Chemins à pied et adresses proches (IGN), quand le calculateur ne trouve pas de chemin.
+  final walkRouter = WalkRouter();
+
+  Future<ItinerarySearch> _journeys(String from, String to, DateTime when, bool arrival) async {
     final data = await prim.journeys(from, to, when, arrival: arrival);
     notifyListeners();
     if (data['error'] != null) {
       throw PrimException((data['error']['message'] ?? data['error']['id'] ?? 'erreur du calculateur').toString());
     }
     return ItinerarySearch.fromNavitia(data, parisMidnight(when));
+  }
+
+  /// « lon;lat » (lieu, position) → coordonnées ; null pour un identifiant d'arrêt ou d'adresse.
+  static LatLng? _coordOf(String id) {
+    final m = RegExp(r'^(-?[\d.]+);(-?[\d.]+)$').firstMatch(id);
+    return m == null ? null : LatLng(double.parse(m[2]!), double.parse(m[1]!));
+  }
+
+  /// Itinéraires (1 requête « calculateur »). Si le calculateur ne rattache pas un point aux rues (lieu
+  /// au milieu d'un grand terrain : il ne propose alors qu'un trait « à vol d'oiseau »), nouvelle
+  /// requête depuis/vers l'adresse la plus proche, et derniers mètres ajoutés à pied. Les tronçons
+  /// « à vol d'oiseau » restants reçoivent un vrai chemin à pied (IGN) quand c'est possible.
+  Future<ItinerarySearch> searchJourneys(String from, String to, DateTime when, {bool arrival = false}) async {
+    var search = await _journeys(from, to, when, arrival);
+    final a = _coordOf(from), b = _coordOf(to);
+    if ((a != null || b != null) && search.journeys.every((j) => j.onlyCrowFly)) {
+      final first = search.journeys.firstOrNull;
+      final a2 = a == null ? null : await walkRouter.nearestAddress(a);
+      final b2 = b == null ? null : await walkRouter.nearestAddress(b);
+      if (a2 != null || b2 != null) {
+        try {
+          final again = await _journeys(
+            a2 == null ? from : '${a2.longitude};${a2.latitude}',
+            b2 == null ? to : '${b2.longitude};${b2.latitude}',
+            when,
+            arrival,
+          );
+          if (again.journeys.any((j) => !j.onlyCrowFly)) {
+            for (final j in again.journeys) {
+              // raccord vers le vrai point, sauf s'il est tout proche (bruit dans la liste des étapes)
+              if (a != null && a2 != null && j.sections.isNotEmpty && distanceMeters(a, a2) > 60) {
+                final d = (distanceMeters(a, a2) / 1.2).round();
+                final place = first?.sections.first.from ?? Place('Départ', a);
+                j.sections.insert(
+                  0,
+                  Section.walk(
+                    place,
+                    j.sections.first.from ?? Place('', a2),
+                    [a, a2],
+                    dep: j.dep - d,
+                    duration: d,
+                    crowFly: true,
+                  ),
+                );
+                j.dep -= d;
+              }
+              if (b != null && b2 != null && j.sections.isNotEmpty && distanceMeters(b2, b) > 60) {
+                final d = (distanceMeters(b2, b) / 1.2).round();
+                final place = first?.sections.last.to ?? Place('Arrivée', b);
+                j.sections.add(
+                  Section.walk(
+                    j.sections.last.to ?? Place('', b2),
+                    place,
+                    [b2, b],
+                    dep: j.arr,
+                    duration: d,
+                    crowFly: true,
+                  ),
+                );
+                j.arr += d;
+              }
+            }
+            search = again;
+          }
+        } catch (_) {
+          // seconde requête impossible : on garde la première réponse
+        }
+      }
+    }
+    await _walkPaths(search);
+    return search;
+  }
+
+  /// Tronçons « à vol d'oiseau » : chemin à pied de l'IGN à la place du trait direct, si disponible.
+  Future<void> _walkPaths(ItinerarySearch search) async {
+    final paths = <String, Future<WalkPath?>>{};
+    final todo = [
+      for (final j in search.journeys)
+        for (final s in j.sections)
+          if (s.crowFly && s.from != null && s.to != null && distanceMeters(s.from!.pos, s.to!.pos) > 15) s,
+    ];
+    for (final s in todo) {
+      final key = '${s.from!.pos}>${s.to!.pos}';
+      final p = await paths.putIfAbsent(key, () => walkRouter.path(s.from!.pos, s.to!.pos));
+      if (p != null) {
+        s.shape = p.shape;
+        s.crowFly = false;
+      }
+    }
   }
 
   /// Temps réel des étapes : une requête « arrêt » par zone de montée, chaque étape y est retrouvée

@@ -1406,7 +1406,12 @@ class _DetailScreen extends StatelessWidget {
         return ListTile(
           dense: true,
           leading: const Icon(Icons.directions_walk),
-          title: Text('${s.type == 'transfer' ? 'Correspondance à pied' : 'À pied'} ${duration(s.duration)}'),
+          // sans chemin connu (pas de réseau pour le demander à l'IGN) : distance directe, pas une durée
+          title: Text(
+            s.crowFly && s.from != null && s.to != null
+                ? 'À vol d\'oiseau · ${distanceLabel(distanceMeters(s.from!.pos, s.to!.pos))}'
+                : '${s.type == 'transfer' ? 'Correspondance à pied' : 'À pied'} ${duration(s.duration)}',
+          ),
           subtitle: Text("jusqu'à ${s.to?.name ?? ''}"),
         );
     }

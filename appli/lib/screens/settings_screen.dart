@@ -595,7 +595,7 @@ class _GeneralTab extends StatelessWidget {
           '${app.catalog.length} lignes au catalogue, ${app.downloaded.length} téléchargée(s).\n'
           'Données : © Île-de-France Mobilités, Licence Mobilités ; communes des arrêts : Licence Ouverte.\n'
           'Fond de carte : OpenFreeMap, © OpenMapTiles, © contributeurs OpenStreetMap.\n'
-          'Lieux : © contributeurs OpenStreetMap. Adresses : © IGN. Entreprises : © INSEE (Sirene).',
+          'Lieux : © contributeurs OpenStreetMap. Adresses et chemins à pied : © IGN. Entreprises : © INSEE (Sirene).',
         ),
         Align(
           alignment: Alignment.centerLeft,

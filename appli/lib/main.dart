@@ -30,7 +30,7 @@ Future<void> main() async {
       ),
       const LicenseEntryWithLineBreaks(
         ['Lieux, adresses et entreprises'],
-        'Lieux © contributeurs OpenStreetMap, ODbL. Adresses © IGN (Géoplateforme). '
+        'Lieux © contributeurs OpenStreetMap, ODbL. Adresses et chemins à pied © IGN (Géoplateforme). '
         'Entreprises © INSEE, base Sirene (API Recherche d\'entreprises).',
       ),
     ]),
