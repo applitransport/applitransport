@@ -885,9 +885,9 @@ class _PlaceFieldState extends State<_PlaceField> {
   Future<void> _favSheet(BuildContext context) async {
     final v = value;
     if (v == null) return;
-    final place = v.favRole != null
-        ? (app.favPlaces.firstWhere((f) => (f['place'] as Map)['ref'] == v.ref)['place'] as Map<String, dynamic>)
-        : v.toJson();
+    // favori supprimé entre-temps (autre écran) : le lieu tel qu'affiché
+    final fav = v.favRole == null ? null : app.favPlaces.where((f) => (f['place'] as Map)['ref'] == v.ref).firstOrNull;
+    final place = fav == null ? v.toJson() : fav['place'] as Map<String, dynamic>;
     final existing = app.favPlaces.where((f) => (f['place'] as Map)['ref'] == v.ref).toList();
     await showModalBottomSheet(
       context: context,

@@ -4,6 +4,10 @@ import 'dart:math';
 
 import 'package:latlong2/latlong.dart';
 
+/// Vitesse de marche pour toutes les durées à pied calculées par l'appli (m/s, ≈ 4 km/h) : celle du
+/// calculateur PRIM (Navitia) et des chemins à pied de l'IGN, pour que les durées concordent.
+const walkSpeed = 1.12;
+
 const _earth = 6371000.0;
 
 /// Distance en mètres (approximation plane, précise à l'échelle d'une ligne).

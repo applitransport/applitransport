@@ -383,8 +383,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final l = app.timetable(id)!;
     final info = app.line(id);
     final ls = app.lineStop(id);
-    final dir = ls != null && ls.dir < l.directions.length ? ls.dir : 0;
-    final d = l.directions.isEmpty ? null : l.directions[dir];
+    // sens retenu qui ne circule pas aujourd'hui : pas de sens (« Pas de service aujourd'hui »)
+    final dir = ls == null ? 0 : ls.dir ?? -1;
+    final d = dir < 0 || dir >= l.directions.length ? null : l.directions[dir];
     final stop = ls?.stop;
     final passages = d == null || stop == null ? const <HomePassage>[] : nextPassages(app, l, dir, stop);
     final now = app.nowSec();
@@ -439,8 +440,13 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(20),
           onTap: () {
             // le suivi de ligne s'ouvre sur cette ligne, ce sens et cet arrêt (sinon le premier arrêt)
-            app.rememberSelection(id, dir, stop: stop);
-            _open(LineScreen(app: app));
+            // (sens retenu sans service aujourd'hui : le premier sens du jour, sans toucher au sens retenu)
+            if (d != null) {
+              app.rememberSelection(id, dir, stop: stop);
+              _open(LineScreen(app: app));
+            } else {
+              _open(LineScreen(app: app, lineId: id));
+            }
           },
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),

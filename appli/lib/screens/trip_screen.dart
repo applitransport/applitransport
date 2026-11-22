@@ -21,7 +21,7 @@ import '../widgets/refresh_controls.dart';
 import '../widgets/traffic_button.dart';
 import 'itinerary_screen.dart';
 import 'lines_map_screen.dart';
-import 'walk_nav_screen.dart' show walkSpeed;
+import '../data/track.dart' show walkSpeed;
 
 const _horizonSec = 2 * 3600; // prochains départs seulement
 

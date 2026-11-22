@@ -17,14 +17,11 @@ import 'package:maplibre_gl/maplibre_gl.dart' as ml;
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../data/location.dart';
-import '../data/track.dart' show distanceMeters;
+import '../data/track.dart' show distanceMeters, walkSpeed;
 import '../poc/app_state.dart';
 import '../poc/nearby.dart' show distanceLabel;
 import '../poc/position.dart' show duration, hhmm;
 import 'line_screen.dart';
-
-/// Vitesse de marche retenue pour les temps restants (m/s, ≈ 4,7 km/h).
-const walkSpeed = 1.3;
 
 /// Cap (degrés, 0 = nord, sens horaire) de [a] vers [b].
 double bearing(LatLng a, LatLng b) {

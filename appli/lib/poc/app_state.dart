@@ -13,7 +13,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../data/community.dart';
 import '../data/package_decoder.dart';
 import '../data/app_update.dart';
-import '../data/track.dart' show distanceMeters;
+import '../data/track.dart' show distanceMeters, walkSpeed;
 import '../data/walk_router.dart';
 import '../data/places_store.dart';
 import '../data/paris_time.dart';
@@ -415,15 +415,32 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Sens et arrêt retenus pour une ligne (null : jamais consultée).
-  ({int dir, String stop})? lineStop(String lineId) {
+  // Le sens est enregistré par son identifiant (0 ou 1 du GTFS), pas par sa place dans la liste du jour :
+  // un jour où la ligne ne circule que dans un sens, la liste n'en a qu'un et les places changent.
+
+  /// Identifiant du sens à la place [index] des horaires du jour de [line].
+  int _dirId(String? line, int index) {
+    final ds = line == null ? null : timetable(line)?.directions;
+    return ds != null && index >= 0 && index < ds.length ? ds[index].id : index;
+  }
+
+  /// Place du sens [id] dans les horaires du jour de [line], ou null s'il ne circule pas ce jour-là.
+  int? _dirIndex(String line, int id) {
+    final i = timetable(line)?.directions.indexWhere((d) => d.id == id) ?? -1;
+    return i < 0 ? null : i;
+  }
+
+  /// Sens (place dans les horaires du jour, null s'il ne circule pas aujourd'hui) et arrêt retenus pour une
+  /// ligne (null : jamais consultée).
+  ({int? dir, String stop})? lineStop(String lineId) {
     // ligne jamais mémorisée : la dernière sélection du suivi de ligne, si c'est elle
     final m =
         settings.lineStops[lineId] ??
         (settings.lastLine == lineId && settings.lastStop != null
             ? {'dir': settings.lastDir, 'stop': settings.lastStop}
             : null);
-    return m == null || m['stop'] == null ? null : (dir: (m['dir'] as num?)?.toInt() ?? 0, stop: m['stop'] as String);
+    if (m == null || m['stop'] == null) return null;
+    return (dir: _dirIndex(lineId, (m['dir'] as num?)?.toInt() ?? 0), stop: m['stop'] as String);
   }
 
   /// Actualiser de l'accueil : serveur communautaire pour chaque ligne préférée, PRIM « arrêt » une fois
@@ -434,9 +451,9 @@ class AppState extends ChangeNotifier {
     for (final id in preferred.where(hasSchedules)) {
       jobs.add(refreshCommunity(id));
       jobs.add(loadTraffic(id));
-      final ls = lineStop(id), l = timetable(id);
-      if (ls == null || l == null || ls.dir >= l.directions.length) continue;
-      final stop = l.directions[ls.dir].stops.where((s) => s.name == ls.stop).firstOrNull;
+      final ls = lineStop(id), l = timetable(id), dir = ls?.dir;
+      if (ls == null || l == null || dir == null) continue;
+      final stop = l.directions[dir].stops.where((s) => s.name == ls.stop).firstOrNull;
       if (stop != null && stop.area.isNotEmpty) (byArea[stop.area] ??= {}).add(id);
     }
     if (token.isNotEmpty) {
@@ -482,11 +499,20 @@ class AppState extends ChangeNotifier {
   void setCommunityShare(bool v) => _set(() => settings.communityShare = v);
   bool get showMyPosition => settings.showMyPosition;
 
-  /// Dernière sélection (ligne, sens, arrêt), partagée par le suivi de ligne et l'état de la ligne.
-  ({String? line, int dir, String? stop}) get lastSelection =>
-      (line: settings.lastLine, dir: settings.lastDir, stop: settings.lastStop);
+  /// Dernière sélection (ligne, sens, arrêt), partagée par le suivi de ligne et l'état de la ligne. [dir] :
+  /// place du sens dans les horaires du jour (le premier s'il ne circule pas aujourd'hui).
+  ({String? line, int dir, String? stop}) get lastSelection {
+    final line = settings.lastLine;
+    return (
+      line: line,
+      dir: line == null ? settings.lastDir : _dirIndex(line, settings.lastDir) ?? 0,
+      stop: settings.lastStop,
+    );
+  }
 
-  void rememberSelection(String? line, int dir, {String? stop}) {
+  /// [dirIndex] : place du sens dans les horaires du jour (enregistré par son identifiant).
+  void rememberSelection(String? line, int dirIndex, {String? stop}) {
+    final dir = _dirId(line, dirIndex);
     // changer de ligne ou de sens oublie l'arrêt ; l'état de la ligne ne choisit pas d'arrêt
     final same = line == settings.lastLine && dir == settings.lastDir;
     if (same && stop == null && settings.lastStop != null) return;
@@ -752,7 +778,7 @@ class AppState extends ChangeNotifier {
             for (final j in again.journeys) {
               // raccord vers le vrai point, sauf s'il est tout proche (bruit dans la liste des étapes)
               if (a != null && a2 != null && j.sections.isNotEmpty && distanceMeters(a, a2) > 60) {
-                final d = (distanceMeters(a, a2) / 1.2).round();
+                final d = (distanceMeters(a, a2) / walkSpeed).round();
                 final place = first?.sections.first.from ?? Place('Départ', a);
                 j.sections.insert(
                   0,
@@ -768,7 +794,7 @@ class AppState extends ChangeNotifier {
                 j.dep -= d;
               }
               if (b != null && b2 != null && j.sections.isNotEmpty && distanceMeters(b2, b) > 60) {
-                final d = (distanceMeters(b2, b) / 1.2).round();
+                final d = (distanceMeters(b2, b) / walkSpeed).round();
                 final place = first?.sections.last.to ?? Place('Arrivée', b);
                 j.sections.add(
                   Section.walk(
