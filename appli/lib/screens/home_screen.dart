@@ -33,6 +33,21 @@ class HomePassage {
   final PassageSource source;
 }
 
+/// Carte d'une ligne de l'accueil : sens affiché ([dir], place dans les horaires du jour, -1 si le sens
+/// retenu ne circule pas aujourd'hui) et arrêt retenu. [direction] est null quand la ligne n'a pas ce sens
+/// aujourd'hui (ou aucun parcours) : la carte affiche alors l'arrêt seul et « Pas de service aujourd'hui ».
+({int dir, Direction? direction, String? stop}) homeCard(DemoLine l, ({int? dir, String stop})? retained) {
+  final dir = retained == null ? 0 : retained.dir ?? -1;
+  final d = dir < 0 || dir >= l.directions.length ? null : l.directions[dir];
+  return (dir: dir, direction: d, stop: retained?.stop);
+}
+
+/// Titre de la carte quand un arrêt est retenu : « arrêt → direction », ou l'arrêt seul sans sens du jour.
+String homeCardTitle(String stop, Direction? d) => d == null ? stop : '$stop → ${d.label}';
+
+/// Message de la carte sans passage à afficher.
+String homeCardEmpty(Direction? d) => d == null ? 'Pas de service aujourd\'hui.' : 'Plus de passage aujourd\'hui.';
+
 /// Les [count] prochains passages de [l] (sens [dir]) à l'arrêt [stop], temps réel compris.
 List<HomePassage> nextPassages(AppState app, DemoLine l, int dir, String stop, {int count = 3}) {
   if (dir >= l.directions.length) return const [];
@@ -382,11 +397,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final scheme = Theme.of(context).colorScheme;
     final l = app.timetable(id)!;
     final info = app.line(id);
-    final ls = app.lineStop(id);
-    // sens retenu qui ne circule pas aujourd'hui : pas de sens (« Pas de service aujourd'hui »)
-    final dir = ls == null ? 0 : ls.dir ?? -1;
-    final d = dir < 0 || dir >= l.directions.length ? null : l.directions[dir];
-    final stop = ls?.stop;
+    final (:dir, direction: d, :stop) = homeCard(l, app.lineStop(id));
     final passages = d == null || stop == null ? const <HomePassage>[] : nextPassages(app, l, dir, stop);
     final now = app.nowSec();
     final disruptions = (app.traffic(id) ?? const <Disruption>[])
@@ -427,10 +438,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final title = stop == null
         ? [info?.longLabel, info?.description].whereType<String>().where((x) => x.isNotEmpty).firstOrNull ?? l.name
-        // aucun parcours aujourd'hui (ligne qui ne circule pas ce jour-là) : l'arrêt seul
-        : d == null
-        ? stop
-        : '$stop → ${d.label}';
+        : homeCardTitle(stop, d);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: _card(context),
@@ -512,10 +520,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600),
                   )
                 else if (passages.isEmpty)
-                  Text(
-                    d == null ? 'Pas de service aujourd\'hui.' : 'Plus de passage aujourd\'hui.',
-                    style: TextStyle(color: scheme.onSurfaceVariant),
-                  )
+                  Text(homeCardEmpty(d), style: TextStyle(color: scheme.onSurfaceVariant))
                 else
                   Row(children: [for (final p in passages) slot(p)]),
               ],

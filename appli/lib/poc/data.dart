@@ -277,6 +277,16 @@ class Direction {
   final List<Stop> stops = [];
 }
 
+/// Place du sens d'identifiant [id] (0 ou 1 du GTFS) dans les horaires du jour [ds], ou null s'il ne
+/// circule pas ce jour-là. Un jour où la ligne ne circule que dans un sens, [ds] n'en a qu'un.
+int? dirIndexOf(List<Direction> ds, int id) {
+  final i = ds.indexWhere((d) => d.id == id);
+  return i < 0 ? null : i;
+}
+
+/// Identifiant du sens à la place [index] des horaires du jour [ds] ([index] tel quel s'il est hors liste).
+int dirIdAt(List<Direction> ds, int index) => index >= 0 && index < ds.length ? ds[index].id : index;
+
 class DemoLine {
   DemoLine(this.id, this.name, this.type, this.color, this.textColor, this.directions);
 

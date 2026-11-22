@@ -421,13 +421,13 @@ class AppState extends ChangeNotifier {
   /// Identifiant du sens à la place [index] des horaires du jour de [line].
   int _dirId(String? line, int index) {
     final ds = line == null ? null : timetable(line)?.directions;
-    return ds != null && index >= 0 && index < ds.length ? ds[index].id : index;
+    return ds == null ? index : dirIdAt(ds, index);
   }
 
   /// Place du sens [id] dans les horaires du jour de [line], ou null s'il ne circule pas ce jour-là.
   int? _dirIndex(String line, int id) {
-    final i = timetable(line)?.directions.indexWhere((d) => d.id == id) ?? -1;
-    return i < 0 ? null : i;
+    final ds = timetable(line)?.directions;
+    return ds == null ? null : dirIndexOf(ds, id);
   }
 
   /// Sens (place dans les horaires du jour, null s'il ne circule pas aujourd'hui) et arrêt retenus pour une
