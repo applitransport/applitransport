@@ -426,7 +426,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final title = stop == null
         ? [info?.longLabel, info?.description].whereType<String>().where((x) => x.isNotEmpty).firstOrNull ?? l.name
-        : '$stop → ${d!.label}';
+        // aucun parcours aujourd'hui (ligne qui ne circule pas ce jour-là) : l'arrêt seul
+        : d == null
+        ? stop
+        : '$stop → ${d.label}';
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: _card(context),
@@ -503,7 +506,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600),
                   )
                 else if (passages.isEmpty)
-                  Text('Plus de passage aujourd\'hui.', style: TextStyle(color: scheme.onSurfaceVariant))
+                  Text(
+                    d == null ? 'Pas de service aujourd\'hui.' : 'Plus de passage aujourd\'hui.',
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  )
                 else
                   Row(children: [for (final p in passages) slot(p)]),
               ],
